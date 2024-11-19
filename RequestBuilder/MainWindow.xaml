@@ -5,8 +5,32 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:RequestBuilder"
         mc:Ignorable="d"
+        xmlns:ViewModels ="clr-namespace:RequestBuilder.ViewModels"
         Title="MainWindow" Height="450" Width="800">
+    
     <Grid>
-
+        <StackPanel>
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="80*"/>
+                    <ColumnDefinition Width="20*"/>
+                </Grid.ColumnDefinitions>
+                <TextBox FontSize="30" Text="{Binding CurrentSession.Url}"></TextBox>
+                <ComboBox FontSize="30"  SelectedItem="{Binding CurrentSession.HttpVerb}" ItemsSource="{Binding Verbs}" Grid.Column="1">
+                </ComboBox>
+            </Grid>
+            <TextBlock FontSize="30"  Text="Headers"/>
+            <TextBox FontSize="20"  Text="{Binding CurrentSession.Headers}" AcceptsReturn="True" Height="150"></TextBox>
+            <TextBlock FontSize="30"  Text="Body"/>
+            <TextBox FontSize="20"  Text="{Binding CurrentSession.Body}" AcceptsReturn="True" Height="150"></TextBox>
+            <Button FontSize="30"  Content="Run" Command="{Binding CurrentSession.RunCommand}"/>
+            <StackPanel Orientation="Horizontal">
+                <TextBlock FontSize="30"  Text="{Binding CurrentSession.Status}"/>
+                <TextBlock FontSize="30"  Text="Response Body"/>
+            </StackPanel>
+            <TextBox FontSize="20"  Text="{Binding CurrentSession.ResponseString}" IsReadOnly="True" AcceptsReturn="True" Height="150"></TextBox>
+            <TextBlock FontSize="30"  Text="Response Headers"/>
+            <TextBox FontSize="20"  Text="{Binding CurrentSession.ResponseHeaders}" IsReadOnly="True" AcceptsReturn="True" Height="150"></TextBox>
+        </StackPanel>
     </Grid>
 </Window>
