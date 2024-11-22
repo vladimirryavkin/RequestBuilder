@@ -1,5 +1,7 @@
-﻿using System.Text;
+﻿using ControlzEx.Standard;
+using System.Text;
 using System.Windows.Threading;
+using Newtonsoft.Json;
 
 namespace RequestBuilder.ViewModels
 {
@@ -28,6 +30,7 @@ namespace RequestBuilder.ViewModels
                 OnPropertyChanged();
             }
         }
+
         public string Url
         {
             get => url;
@@ -37,6 +40,7 @@ namespace RequestBuilder.ViewModels
                 OnPropertyChanged();
             }
         }
+
         public HttpVerb HttpVerb
         {
             get => httpVerb;
@@ -46,6 +50,7 @@ namespace RequestBuilder.ViewModels
                 OnPropertyChanged();
             }
         }
+
         public string Headers
         {
             get => headers;
@@ -55,6 +60,7 @@ namespace RequestBuilder.ViewModels
                 OnPropertyChanged();
             }
         }
+
         public string Body
         {
             get => body;
@@ -64,6 +70,7 @@ namespace RequestBuilder.ViewModels
                 OnPropertyChanged();
             }
         }
+
         public string ResponseHeaders
         {
             get => responseHeaders;
@@ -73,6 +80,7 @@ namespace RequestBuilder.ViewModels
                 OnPropertyChanged();
             }
         }
+
         public string ResponseString
         {
             get => responseString;
@@ -82,6 +90,45 @@ namespace RequestBuilder.ViewModels
                 OnPropertyChanged();
             }
         }
+
+        public Command SetHeaderCommand => new Command(obj =>
+        {
+            var str = obj as string;
+            if (str == null) return;
+            var header = SplitHeader(str);
+            if (header == null) return;
+            var headers = GetHeaders();
+            var headerIndex = headers.FindIndex(x => header.Value.Key.Equals(x.Key, StringComparison.OrdinalIgnoreCase));
+            if (headerIndex == -1)
+            {
+                headers.Add(header.Value);
+            }
+            else
+            {
+                headers[headerIndex] = header.Value;
+            }
+            var headerSb = new StringBuilder();
+            foreach (var h in headers)
+            {
+                headerSb.Append($"{h.Key}: {h.Value}").AppendLine();
+            }
+            Headers = headerSb.ToString();
+        });
+
+        public Command PrettyJsonCommand => new Command(() => {
+            try
+            {
+                if (string.IsNullOrEmpty(ResponseString))
+                    return;
+                var obj = JsonConvert.DeserializeObject<Dictionary<string, object>>(ResponseString);
+                var res = JsonConvert.SerializeObject(obj, Formatting.Indented);
+                ResponseString = res;
+            }
+            catch 
+            {
+
+            }
+        });
 
         public Command RunCommand => new Command(async () =>
         {
@@ -110,7 +157,7 @@ namespace RequestBuilder.ViewModels
         private async Task DoRequest()
         {
             var headers = GetHeaders();
-            var agentIndex = headers.FindIndex(x => "user-agent".Equals(x.Key, StringComparison.OrdinalIgnoreCase));
+            var agentIndex = GetUserAgentIndex(headers);
             var agentString = (string)null;
             if (agentIndex != -1)
             {
@@ -150,20 +197,35 @@ namespace RequestBuilder.ViewModels
             }));
         }
 
+        private static int GetUserAgentIndex(List<KeyValuePair<string, string>> headers)
+        {
+            return headers.FindIndex(x => "user-agent".Equals(x.Key, StringComparison.OrdinalIgnoreCase));
+        }
+
         private List<KeyValuePair<string, string>> GetHeaders()
         {
             var result = new List<KeyValuePair<string, string>>();
+            if (string.IsNullOrWhiteSpace(Headers))
+                return new List<KeyValuePair<string, string>>();
             var headersRaw = Headers.SplitToLines(true).ToList();
             foreach (var item in headersRaw)
             {
-                var colon = item.IndexOf(':');
-                if (colon == -1)
+                var pair = SplitHeader(item);
+                if (pair == null)
                     continue;
-                var key = item.Substring(0, colon);
-                var value = item.Substring(colon + 1).TrimStart();
-                result.Add(key, value);
+                result.Add(pair.Value);
             }
             return result;
+        }
+
+        private KeyValuePair<string, string>? SplitHeader(string header)
+        {
+            var colon = header.IndexOf(':');
+            if (colon == -1)
+                return null;
+            var key = header.Substring(0, colon);
+            var value = header.Substring(colon + 1).TrimStart();
+            return new KeyValuePair<string, string>(key, value);
         }
     }
 }

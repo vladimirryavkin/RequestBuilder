@@ -1,36 +1,100 @@
-﻿<Window x:Class="RequestBuilder.MainWindow"
+﻿<mah:MetroWindow x:Class="RequestBuilder.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:iconPacks="http://metro.mahapps.com/winfx/xaml/iconpacks"
         xmlns:local="clr-namespace:RequestBuilder"
         mc:Ignorable="d"
+        xmlns:mah="clr-namespace:MahApps.Metro.Controls;assembly=MahApps.Metro"
         xmlns:ViewModels ="clr-namespace:RequestBuilder.ViewModels"
         Title="MainWindow" Height="450" Width="800">
-    
+    <Window.Resources>
+        <Thickness x:Key="ControlMargin">0 5 0 0</Thickness>
+    </Window.Resources>
     <Grid>
-        <StackPanel>
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="80*"/>
-                    <ColumnDefinition Width="20*"/>
-                </Grid.ColumnDefinitions>
-                <TextBox FontSize="30" Text="{Binding CurrentSession.Url}"></TextBox>
-                <ComboBox FontSize="30"  SelectedItem="{Binding CurrentSession.HttpVerb}" ItemsSource="{Binding Verbs}" Grid.Column="1">
-                </ComboBox>
-            </Grid>
-            <TextBlock FontSize="30"  Text="Headers"/>
-            <TextBox FontSize="20"  Text="{Binding CurrentSession.Headers}" AcceptsReturn="True" Height="150"></TextBox>
-            <TextBlock FontSize="30"  Text="Body"/>
-            <TextBox FontSize="20"  Text="{Binding CurrentSession.Body}" AcceptsReturn="True" Height="150"></TextBox>
-            <Button FontSize="30"  Content="Run" Command="{Binding CurrentSession.RunCommand}"/>
-            <StackPanel Orientation="Horizontal">
-                <TextBlock FontSize="30"  Text="{Binding CurrentSession.Status}"/>
-                <TextBlock FontSize="30"  Text="Response Body"/>
-            </StackPanel>
-            <TextBox FontSize="20"  Text="{Binding CurrentSession.ResponseString}" IsReadOnly="True" AcceptsReturn="True" Height="150"></TextBox>
-            <TextBlock FontSize="30"  Text="Response Headers"/>
-            <TextBox FontSize="20"  Text="{Binding CurrentSession.ResponseHeaders}" IsReadOnly="True" AcceptsReturn="True" Height="150"></TextBox>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="20*"/>
+            <ColumnDefinition Width="80*"/>
+        </Grid.ColumnDefinitions>
+        <ScrollViewer>
+            <StackPanel></StackPanel>
+        </ScrollViewer>
+        <StackPanel Grid.Column="1">
+            <GroupBox 
+                Margin="4 2"
+                Header="Request building"
+                UseLayoutRounding="True">
+                <AdornerDecorator>
+                    <ScrollViewer Height="900">
+                        <StackPanel>
+                            <Expander Margin="0"
+                                Header="Request"
+                                IsExpanded="True">
+                                <StackPanel>
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="80*"/>
+                                            <ColumnDefinition Width="20*"/>
+                                        </Grid.ColumnDefinitions>
+
+                                        <TextBox FontSize="30" Text="{Binding CurrentSession.Url}"></TextBox>
+                                        <ComboBox FontSize="30"  SelectedItem="{Binding CurrentSession.HttpVerb}" ItemsSource="{Binding Verbs}" Grid.Column="1">
+                                        </ComboBox>
+                                    </Grid>
+                                    <mah:MetroHeader Margin="{StaticResource ControlMargin}" Header="TextBox Header">
+                                        <mah:MetroHeader.HeaderTemplate>
+                                            <DataTemplate>
+                                                <StackPanel VerticalAlignment="Center" Orientation="Horizontal">
+                                                    <iconPacks:PackIconMaterial VerticalAlignment="Center" Kind="TextBox" />
+                                                    <TextBlock Margin="2 0 0 0"
+                                                        VerticalAlignment="Center"
+                                                        Text="Request headers" />
+                                                </StackPanel>
+                                            </DataTemplate>
+                                        </mah:MetroHeader.HeaderTemplate>
+                                        <TextBox Text="{Binding CurrentSession.Headers, UpdateSourceTrigger=PropertyChanged}" AcceptsReturn="True" Height="200" SpellCheck.IsEnabled="True">
+                                            <TextBox.ContextMenu>
+                                                <ContextMenu>
+                                                    <MenuItem Header="User-Agent: Chrome" Command="{Binding CurrentSession.SetHeaderCommand}" CommandParameter="User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"/>
+                                                    <MenuItem Header="User-Agent: Edge" Command="{Binding CurrentSession.SetHeaderCommand}" CommandParameter="User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36 Edg/131.0.2903.51"/>
+                                                    <MenuItem Header="User-Agent: Firefox" Command="{Binding CurrentSession.SetHeaderCommand}" CommandParameter="User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:132.0) Gecko/20100101 Firefox/132.0"/>
+                                                    <MenuItem Header="User-Agent: Opera" Command="{Binding CurrentSession.SetHeaderCommand}" CommandParameter="User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36 OPR/114.0.0.0"/>
+                                                    <MenuItem Header="Content-Type: application/json" Command="{Binding CurrentSession.SetHeaderCommand}" CommandParameter="Content-Type: application/json"/>
+                                                    <MenuItem Header="Content-Type: application/x-www-form-urlencoded" Command="{Binding CurrentSession.SetHeaderCommand}" CommandParameter="Content-Type: application/x-www-form-urlencoded"/>
+                                                </ContextMenu>
+                                            </TextBox.ContextMenu>
+                                        </TextBox>
+                                    </mah:MetroHeader>
+
+                                    <TextBlock FontSize="30"  Text="Body"/>
+                                    <TextBox FontSize="20" Text="{Binding CurrentSession.Body}" AcceptsReturn="True" Height="450"></TextBox>
+                                    <Button FontSize="30"  Content="Run" Command="{Binding CurrentSession.RunCommand}"/>
+                                </StackPanel>
+                            </Expander>
+
+                            <Expander Margin="0"
+                                Header="Response"
+                                IsExpanded="False">
+                                <StackPanel>
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock FontSize="30"  Text="{Binding CurrentSession.Status}"/>
+                                        <Button Content="Pretty JSON" Command="{Binding CurrentSession.PrettyJsonCommand}"/>
+                                    </StackPanel>
+                                    <TextBox FontSize="20" Text="{Binding CurrentSession.ResponseString}" IsReadOnly="True" AcceptsReturn="True" Height="800"></TextBox>
+                                    <Expander Margin="0"
+                                        Header="Respones headers"
+                                        IsExpanded="False">
+                                        <StackPanel>
+                                            <TextBox FontSize="20" Text="{Binding CurrentSession.ResponseHeaders}" IsReadOnly="True" AcceptsReturn="True" Height="150"></TextBox>
+                                        </StackPanel>
+                                    </Expander>
+                                </StackPanel>
+                            </Expander>
+                        </StackPanel>
+                    </ScrollViewer>
+                </AdornerDecorator>
+            </GroupBox>
         </StackPanel>
     </Grid>
-</Window>
+</mah:MetroWindow>

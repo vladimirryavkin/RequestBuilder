@@ -1,4 +1,5 @@
-﻿using RequestBuilder.ViewModels;
+﻿using MahApps.Metro.Controls;
+using RequestBuilder.ViewModels;
 using System.Text;
 using System.Windows;
 using System.Windows.Controls;
@@ -15,7 +16,7 @@ namespace RequestBuilder
     /// <summary>
     /// Interaction logic for MainWindow.xaml
     /// </summary>
-    public partial class MainWindow : Window
+    public partial class MainWindow : MetroWindow
     {
         public MainWindow()
         {

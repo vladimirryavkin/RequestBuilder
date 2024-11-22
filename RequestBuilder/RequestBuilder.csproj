@@ -6,6 +6,11 @@
 		<UseWPF>true</UseWPF>
 	</PropertyGroup>
 	<ItemGroup>
+	  <PackageReference Include="MahApps.Metro" Version="2.4.10" />
+	  <PackageReference Include="MahApps.Metro.IconPacks" Version="5.1.0" />
+	  <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+	</ItemGroup>
+	<ItemGroup>
 	  <ProjectReference Include="..\RequestBuilder.Core\RequestBuilder.Core.csproj" />
 	</ItemGroup>
 </Project>
