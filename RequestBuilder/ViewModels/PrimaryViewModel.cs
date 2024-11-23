@@ -8,20 +8,23 @@ using System.Windows.Threading;
 
 namespace RequestBuilder.ViewModels
 {
-    public class PrimrayViewModel : BaseViewModel
+    public class PrimaryViewModel : BaseViewModel
     {
         private RequestSessionViewModel currentSession;
         private ObservableCollection<HttpVerb> verbs;
         private Dispatcher dispatcher;
+        private double width;
+        private double height;
 
-        public PrimrayViewModel(Dispatcher dispatcher)
+        public PrimaryViewModel(Dispatcher dispatcher)
         {
             this.dispatcher = dispatcher;
         }
 
         public RequestSessionViewModel CurrentSession
         {
-            get { 
+            get
+            {
                 if (currentSession == null)
                 {
                     currentSession = new RequestSessionViewModel(dispatcher);
@@ -46,6 +49,26 @@ namespace RequestBuilder.ViewModels
                     verbs.AddRange(values);
                 }
                 return verbs;
+            }
+        }
+
+        public double Width
+        {
+            get => width;
+            set
+            {
+                width = value;
+                OnPropertyChanged();
+            }
+        }
+
+        public double Height
+        {
+            get => height;
+            set
+            {
+                height = value;
+                OnPropertyChanged();
             }
         }
     }

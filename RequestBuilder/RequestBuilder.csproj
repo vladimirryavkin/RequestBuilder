@@ -13,4 +13,7 @@
 	<ItemGroup>
 	  <ProjectReference Include="..\RequestBuilder.Core\RequestBuilder.Core.csproj" />
 	</ItemGroup>
+	<ItemGroup>
+	  <Folder Include="Views\" />
+	</ItemGroup>
 </Project>

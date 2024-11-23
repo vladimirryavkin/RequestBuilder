@@ -2,6 +2,7 @@
 using System.Text;
 using System.Windows.Threading;
 using Newtonsoft.Json;
+using System.Collections.ObjectModel;
 
 namespace RequestBuilder.ViewModels
 {
@@ -15,10 +16,12 @@ namespace RequestBuilder.ViewModels
         private string responseString;
         private string status;
         private Dispatcher dispatcher;
+        private ObservableCollection<string> urls;
 
         public RequestSessionViewModel(Dispatcher dispatcher)
         {
             this.dispatcher = dispatcher;
+            HttpVerb = HttpVerb.Get;
         }
 
         public string Status
@@ -37,9 +40,20 @@ namespace RequestBuilder.ViewModels
             set
             {
                 url = value;
+                SetupUrls();
                 OnPropertyChanged();
             }
         }
+
+        public ObservableCollection<string> Urls
+        {
+            get
+            {
+                return urls ??= [];
+            }
+        }
+
+        
 
         public HttpVerb HttpVerb
         {
@@ -115,7 +129,8 @@ namespace RequestBuilder.ViewModels
             Headers = headerSb.ToString();
         });
 
-        public Command PrettyJsonCommand => new Command(() => {
+        public Command PrettyJsonCommand => new Command(() =>
+        {
             try
             {
                 if (string.IsNullOrEmpty(ResponseString))
@@ -124,7 +139,7 @@ namespace RequestBuilder.ViewModels
                 var res = JsonConvert.SerializeObject(obj, Formatting.Indented);
                 ResponseString = res;
             }
-            catch 
+            catch
             {
 
             }
@@ -182,6 +197,7 @@ namespace RequestBuilder.ViewModels
             }
             request.ProceedOnError = true;
             var result = await helper.MakeRemoteRequestAsync(request);
+            RequestedUrlsCache.Instance.AddUrl(request.GetUrl());
             var headerSb = new StringBuilder();
             foreach (var header in result.ResponseHeaders)
             {
@@ -226,6 +242,18 @@ namespace RequestBuilder.ViewModels
             var key = header.Substring(0, colon);
             var value = header.Substring(colon + 1).TrimStart();
             return new KeyValuePair<string, string>(key, value);
+        }
+
+        private void SetupUrls()
+        {
+            if (urls == null)
+            {
+                urls = new ObservableCollection<string>();
+            }
+            var list = RequestedUrlsCache.Instance.GetUrls(url);
+            urls.Clear();
+            urls.AddRange(list);
+            OnPropertyChanged(nameof(Urls));
         }
     }
 }

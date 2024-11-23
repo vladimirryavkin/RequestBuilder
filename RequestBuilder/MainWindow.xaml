@@ -26,7 +26,7 @@
                 Header="Request building"
                 UseLayoutRounding="True">
                 <AdornerDecorator>
-                    <ScrollViewer Height="900">
+                    <ScrollViewer d:Height="900" Height="{Binding Height, Converter={StaticResource DoubleAdjustment}, ConverterParameter=75}">
                         <StackPanel>
                             <Expander Margin="0"
                                 Header="Request"
@@ -37,8 +37,8 @@
                                             <ColumnDefinition Width="80*"/>
                                             <ColumnDefinition Width="20*"/>
                                         </Grid.ColumnDefinitions>
-
-                                        <TextBox FontSize="30" Text="{Binding CurrentSession.Url}"></TextBox>
+                                        <ComboBox FontSize="30" IsEditable="True" Text="{Binding CurrentSession.Url}" ItemsSource="{Binding CurrentSession.Urls}"></ComboBox>
+                                        
                                         <ComboBox FontSize="30"  SelectedItem="{Binding CurrentSession.HttpVerb}" ItemsSource="{Binding Verbs}" Grid.Column="1">
                                         </ComboBox>
                                     </Grid>
@@ -53,7 +53,7 @@
                                                 </StackPanel>
                                             </DataTemplate>
                                         </mah:MetroHeader.HeaderTemplate>
-                                        <TextBox Text="{Binding CurrentSession.Headers, UpdateSourceTrigger=PropertyChanged}" AcceptsReturn="True" Height="200" SpellCheck.IsEnabled="True">
+                                        <TextBox Text="{Binding CurrentSession.Headers, UpdateSourceTrigger=PropertyChanged}" AcceptsReturn="True" Height="200" d:Height="200" SpellCheck.IsEnabled="True">
                                             <TextBox.ContextMenu>
                                                 <ContextMenu>
                                                     <MenuItem Header="User-Agent: Chrome" Command="{Binding CurrentSession.SetHeaderCommand}" CommandParameter="User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"/>
@@ -68,7 +68,7 @@
                                     </mah:MetroHeader>
 
                                     <TextBlock FontSize="30"  Text="Body"/>
-                                    <TextBox FontSize="20" Text="{Binding CurrentSession.Body}" AcceptsReturn="True" Height="450"></TextBox>
+                                    <TextBox FontSize="20" Text="{Binding CurrentSession.Body}" AcceptsReturn="True" d:Height="450" MinHeight="450" Height="{Binding Height, Converter={StaticResource DoubleAdjustment}, ConverterParameter=520}"></TextBox>
                                     <Button FontSize="30"  Content="Run" Command="{Binding CurrentSession.RunCommand}"/>
                                 </StackPanel>
                             </Expander>
@@ -81,7 +81,7 @@
                                         <TextBlock FontSize="30"  Text="{Binding CurrentSession.Status}"/>
                                         <Button Content="Pretty JSON" Command="{Binding CurrentSession.PrettyJsonCommand}"/>
                                     </StackPanel>
-                                    <TextBox FontSize="20" Text="{Binding CurrentSession.ResponseString}" IsReadOnly="True" AcceptsReturn="True" Height="800"></TextBox>
+                                    <TextBox FontSize="20" Text="{Binding CurrentSession.ResponseString}" IsReadOnly="True" AcceptsReturn="True" MinHeight="600" Height="{Binding Height, Converter={StaticResource DoubleAdjustment}, ConverterParameter=210}" d:Height="800"></TextBox>
                                     <Expander Margin="0"
                                         Header="Respones headers"
                                         IsExpanded="False">
