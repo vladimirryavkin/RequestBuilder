@@ -53,8 +53,6 @@ namespace RequestBuilder.ViewModels
             }
         }
 
-        
-
         public HttpVerb HttpVerb
         {
             get => httpVerb;
@@ -246,13 +244,13 @@ namespace RequestBuilder.ViewModels
 
         private void SetupUrls()
         {
-            if (urls == null)
-            {
-                urls = new ObservableCollection<string>();
-            }
             var list = RequestedUrlsCache.Instance.GetUrls(url);
-            urls.Clear();
-            urls.AddRange(list);
+            Urls.Clear();
+            foreach (var url in list)
+            {
+                if (!Urls.Contains(url))
+                    Urls.Add(url);
+            }
             OnPropertyChanged(nameof(Urls));
         }
     }
