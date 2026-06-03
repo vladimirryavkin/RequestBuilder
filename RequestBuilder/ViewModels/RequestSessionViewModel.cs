@@ -143,8 +143,14 @@ namespace RequestBuilder.ViewModels
             }
         });
 
+        public event Action<RequestHistoryItem>? RequestCompleted;
+
         public Command RunCommand => new Command(async () =>
         {
+            var capturedUrl = Url;
+            var capturedVerb = HttpVerb;
+            var capturedHeaders = Headers;
+            var capturedBody = Body;
             try
             {
                 await DoRequest();
@@ -163,12 +169,18 @@ namespace RequestBuilder.ViewModels
                         responseString += err.StackTrace + "\r\n";
                         err = err.InnerException;
                     }
+                    RequestCompleted?.Invoke(new RequestHistoryItem(capturedUrl, capturedVerb, capturedHeaders, capturedBody,
+                        responseString, "", status));
                 });
             }
         });
 
         private async Task DoRequest()
         {
+            var capturedUrl = Url;
+            var capturedVerb = HttpVerb;
+            var capturedHeaders = Headers;
+            var capturedBody = Body;
             var headers = GetHeaders();
             var agentIndex = GetUserAgentIndex(headers);
             var agentString = (string)null;
@@ -208,6 +220,8 @@ namespace RequestBuilder.ViewModels
                 ResponseHeaders = headerSb.ToString();
                 ResponseString = responseText;
                 Status = status;
+                RequestCompleted?.Invoke(new RequestHistoryItem(capturedUrl, capturedVerb, capturedHeaders, capturedBody,
+                    responseText, headerSb.ToString(), status));
             }));
         }
 

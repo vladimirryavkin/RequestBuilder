@@ -15,6 +15,8 @@ namespace RequestBuilder.ViewModels
         private Dispatcher dispatcher;
         private double width;
         private double height;
+        private ObservableCollection<RequestHistoryItem> history;
+        private RequestHistoryItem selectedHistoryItem;
 
         public PrimaryViewModel(Dispatcher dispatcher)
         {
@@ -28,6 +30,7 @@ namespace RequestBuilder.ViewModels
                 if (currentSession == null)
                 {
                     currentSession = new RequestSessionViewModel(dispatcher);
+                    currentSession.RequestCompleted += OnRequestCompleted;
                 }
                 return currentSession;
             }
@@ -36,6 +39,36 @@ namespace RequestBuilder.ViewModels
                 currentSession = value;
                 OnPropertyChanged();
             }
+        }
+
+        public ObservableCollection<RequestHistoryItem> History
+        {
+            get => history ??= new ObservableCollection<RequestHistoryItem>();
+        }
+
+        public RequestHistoryItem SelectedHistoryItem
+        {
+            get => selectedHistoryItem;
+            set
+            {
+                selectedHistoryItem = value;
+                OnPropertyChanged();
+                if (value != null)
+                {
+                    CurrentSession.Url = value.Url;
+                    CurrentSession.HttpVerb = value.HttpVerb;
+                    CurrentSession.Headers = value.Headers;
+                    CurrentSession.Body = value.Body;
+                    CurrentSession.ResponseString = value.ResponseString;
+                    CurrentSession.ResponseHeaders = value.ResponseHeaders;
+                    CurrentSession.Status = value.Status;
+                }
+            }
+        }
+
+        private void OnRequestCompleted(RequestHistoryItem item)
+        {
+            History.Insert(0, item);
         }
 
         public ObservableCollection<HttpVerb> Verbs

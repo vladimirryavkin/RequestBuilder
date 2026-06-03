@@ -18,7 +18,27 @@
             <ColumnDefinition Width="80*"/>
         </Grid.ColumnDefinitions>
         <ScrollViewer>
-            <StackPanel></StackPanel>
+            <StackPanel x:Name="LeftPanel">
+                <ListBox ItemsSource="{Binding History}"
+                         SelectedItem="{Binding SelectedHistoryItem}"
+                         HorizontalContentAlignment="Stretch"
+                         ScrollViewer.VerticalScrollBarVisibility="Disabled"
+                         BorderThickness="0"
+                         Background="Transparent">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate>
+                            <StackPanel Margin="2 3">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="{Binding HttpVerb}" FontWeight="Bold" FontSize="11" Margin="0 0 5 0"/>
+                                    <TextBlock Text="{Binding Status}" FontSize="11"/>
+                                </StackPanel>
+                                <TextBlock Text="{Binding ShortUrl}" FontSize="10" TextTrimming="CharacterEllipsis"/>
+                                <TextBlock Text="{Binding Timestamp, StringFormat=HH:mm:ss}" FontSize="9" Opacity="0.55"/>
+                            </StackPanel>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+            </StackPanel>
         </ScrollViewer>
         <StackPanel Grid.Column="1">
             <GroupBox 
