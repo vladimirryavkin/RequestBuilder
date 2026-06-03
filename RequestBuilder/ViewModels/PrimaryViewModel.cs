@@ -1,10 +1,12 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Threading;
+using Microsoft.Win32;
 
 namespace RequestBuilder.ViewModels
 {
@@ -21,6 +23,8 @@ namespace RequestBuilder.ViewModels
         public PrimaryViewModel(Dispatcher dispatcher)
         {
             this.dispatcher = dispatcher;
+            foreach (var item in HistoryPersistenceService.Load())
+                History.Add(item);
         }
 
         public RequestSessionViewModel CurrentSession
@@ -69,6 +73,56 @@ namespace RequestBuilder.ViewModels
         private void OnRequestCompleted(RequestHistoryItem item)
         {
             History.Insert(0, item);
+            HistoryPersistenceService.Save(History);
+        }
+
+        public Command DeleteHistoryItemCommand => new Command(obj =>
+        {
+            if (obj is RequestHistoryItem item)
+            {
+                History.Remove(item);
+                HistoryPersistenceService.Save(History);
+            }
+        });
+
+        public Command SaveRequestCommand => new Command(obj =>
+        {
+            if (obj is RequestHistoryItem item)
+                SaveTextToFile(HistoryPersistenceService.FormatRequest(item), "request");
+        });
+
+        public Command SaveResponseCommand => new Command(obj =>
+        {
+            if (obj is RequestHistoryItem item)
+                SaveTextToFile(HistoryPersistenceService.FormatResponse(item), "response");
+        });
+
+        public Command SaveRequestAndResponseCommand => new Command(obj =>
+        {
+            if (obj is RequestHistoryItem item)
+            {
+                var sb = new StringBuilder();
+                sb.AppendLine("===== REQUEST =====");
+                sb.AppendLine();
+                sb.Append(HistoryPersistenceService.FormatRequest(item));
+                sb.AppendLine();
+                sb.AppendLine("===== RESPONSE =====");
+                sb.AppendLine();
+                sb.Append(HistoryPersistenceService.FormatResponse(item));
+                SaveTextToFile(sb.ToString(), "request_response");
+            }
+        });
+
+        private void SaveTextToFile(string content, string defaultName)
+        {
+            var dialog = new SaveFileDialog
+            {
+                Filter = "Text files (*.txt)|*.txt|All files (*.*)|*.*",
+                DefaultExt = "txt",
+                FileName = defaultName
+            };
+            if (dialog.ShowDialog() == true)
+                File.WriteAllText(dialog.FileName, content);
         }
 
         public ObservableCollection<HttpVerb> Verbs

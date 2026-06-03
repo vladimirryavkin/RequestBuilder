@@ -170,7 +170,7 @@ namespace RequestBuilder.ViewModels
                         err = err.InnerException;
                     }
                     RequestCompleted?.Invoke(new RequestHistoryItem(capturedUrl, capturedVerb, capturedHeaders, capturedBody,
-                        responseString, "", status));
+                        responseString, "", status, 0));
                 });
             }
         });
@@ -221,7 +221,7 @@ namespace RequestBuilder.ViewModels
                 ResponseString = responseText;
                 Status = status;
                 RequestCompleted?.Invoke(new RequestHistoryItem(capturedUrl, capturedVerb, capturedHeaders, capturedBody,
-                    responseText, headerSb.ToString(), status));
+                    responseText, headerSb.ToString(), status, (int)result.StatusCode));
             }));
         }
 
