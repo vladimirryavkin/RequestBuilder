@@ -72,16 +72,16 @@ namespace RequestBuilder.ViewModels
 
         private void OnRequestCompleted(RequestHistoryItem item)
         {
+            HistoryPersistenceService.SaveItem(item);
             History.Insert(0, item);
-            HistoryPersistenceService.Save(History);
         }
 
         public Command DeleteHistoryItemCommand => new Command(obj =>
         {
             if (obj is RequestHistoryItem item)
             {
+                HistoryPersistenceService.DeleteItem(item);
                 History.Remove(item);
-                HistoryPersistenceService.Save(History);
             }
         });
 

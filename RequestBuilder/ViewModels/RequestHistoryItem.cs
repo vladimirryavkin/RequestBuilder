@@ -14,6 +14,8 @@ namespace RequestBuilder.ViewModels
         public int StatusCode { get; set; }
         public DateTime Timestamp { get; set; }
 
+        public string FolderPath { get; set; }
+
         public string ShortUrl =>
             string.IsNullOrEmpty(Url) ? "(empty)" :
             Url.Length > 38 ? Url.Substring(0, 35) + "..." : Url;

@@ -8,38 +8,105 @@ namespace RequestBuilder.ViewModels
 {
     public static class HistoryPersistenceService
     {
-        private static string GetHistoryFilePath()
+        private class MetaData
+        {
+            public string Url { get; set; }
+            public string HttpVerb { get; set; }
+            public string Status { get; set; }
+            public int StatusCode { get; set; }
+            public DateTime Timestamp { get; set; }
+        }
+
+        private static string GetHistoryDir()
         {
             var dir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "history");
             Directory.CreateDirectory(dir);
-            return Path.Combine(dir, "history.json");
+            return dir;
+        }
+
+        public static void SaveItem(RequestHistoryItem item)
+        {
+            try
+            {
+                var folderName = item.Timestamp.ToString("yyyyMMdd_HHmmss_fff");
+                var folder = Path.Combine(GetHistoryDir(), folderName);
+                Directory.CreateDirectory(folder);
+
+                var meta = new MetaData
+                {
+                    Url = item.Url,
+                    HttpVerb = item.HttpVerb.ToString(),
+                    Status = item.Status,
+                    StatusCode = item.StatusCode,
+                    Timestamp = item.Timestamp
+                };
+                File.WriteAllText(Path.Combine(folder, "meta.json"),
+                    JsonConvert.SerializeObject(meta, Formatting.Indented));
+
+                File.WriteAllText(Path.Combine(folder, "request_headers.txt"), item.Headers ?? string.Empty);
+                File.WriteAllText(Path.Combine(folder, "request_body.txt"), item.Body ?? string.Empty);
+                File.WriteAllText(Path.Combine(folder, "response_headers.txt"), item.ResponseHeaders ?? string.Empty);
+                File.WriteAllText(Path.Combine(folder, "response_body.txt"), item.ResponseString ?? string.Empty);
+
+                item.FolderPath = folder;
+            }
+            catch { }
+        }
+
+        public static void DeleteItem(RequestHistoryItem item)
+        {
+            try
+            {
+                if (!string.IsNullOrEmpty(item.FolderPath) && Directory.Exists(item.FolderPath))
+                    Directory.Delete(item.FolderPath, recursive: true);
+            }
+            catch { }
         }
 
         public static List<RequestHistoryItem> Load()
         {
+            var result = new List<RequestHistoryItem>();
             try
             {
-                var path = GetHistoryFilePath();
-                if (!File.Exists(path))
-                    return new List<RequestHistoryItem>();
-                var json = File.ReadAllText(path);
-                return JsonConvert.DeserializeObject<List<RequestHistoryItem>>(json)
-                       ?? new List<RequestHistoryItem>();
-            }
-            catch
-            {
-                return new List<RequestHistoryItem>();
-            }
-        }
+                foreach (var folder in Directory.GetDirectories(GetHistoryDir()))
+                {
+                    try
+                    {
+                        var metaPath = Path.Combine(folder, "meta.json");
+                        if (!File.Exists(metaPath))
+                            continue;
 
-        public static void Save(IEnumerable<RequestHistoryItem> items)
-        {
-            try
-            {
-                var json = JsonConvert.SerializeObject(items, Formatting.Indented);
-                File.WriteAllText(GetHistoryFilePath(), json);
+                        var meta = JsonConvert.DeserializeObject<MetaData>(File.ReadAllText(metaPath));
+                        if (meta == null)
+                            continue;
+
+                        result.Add(new RequestHistoryItem
+                        {
+                            Url = meta.Url,
+                            HttpVerb = Enum.Parse<HttpVerb>(meta.HttpVerb),
+                            Status = meta.Status,
+                            StatusCode = meta.StatusCode,
+                            Timestamp = meta.Timestamp,
+                            Headers = ReadFile(folder, "request_headers.txt"),
+                            Body = ReadFile(folder, "request_body.txt"),
+                            ResponseHeaders = ReadFile(folder, "response_headers.txt"),
+                            ResponseString = ReadFile(folder, "response_body.txt"),
+                            FolderPath = folder
+                        });
+                    }
+                    catch { }
+                }
             }
             catch { }
+
+            result.Sort((a, b) => b.Timestamp.CompareTo(a.Timestamp));
+            return result;
+        }
+
+        private static string ReadFile(string folder, string filename)
+        {
+            var path = Path.Combine(folder, filename);
+            return File.Exists(path) ? File.ReadAllText(path) : string.Empty;
         }
 
         public static string FormatRequest(RequestHistoryItem item)
