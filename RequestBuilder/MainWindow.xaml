@@ -140,10 +140,19 @@
                                 Header="Response"
                                 IsExpanded="{Binding CurrentSession.IsResponseExpanded, Mode=TwoWay}">
                                 <StackPanel>
-                                    <StackPanel Orientation="Horizontal">
-                                        <TextBlock FontSize="30"  Text="{Binding CurrentSession.Status}"/>
-                                        <Button Content="Pretty JSON" Command="{Binding CurrentSession.PrettyJsonCommand}"/>
-                                    </StackPanel>
+                                    <Grid Margin="0 0 0 4">
+                                        <TextBlock FontSize="30"
+                                                   Text="{Binding CurrentSession.Status}"
+                                                   VerticalAlignment="Center"/>
+                                        <Button HorizontalAlignment="Right"
+                                                VerticalAlignment="Center"
+                                                Content="Pretty JSON"
+                                                Command="{Binding CurrentSession.PrettyJsonCommand}"
+                                                Style="{StaticResource MahApps.Styles.Button.Square}"
+                                                mah:ControlsHelper.ContentCharacterCasing="Normal"
+                                                FontSize="12"
+                                                Padding="10 4"/>
+                                    </Grid>
                                     <TextBox FontSize="20" Text="{Binding CurrentSession.ResponseString}" IsReadOnly="True" AcceptsReturn="True" MinHeight="600" Height="{Binding Height, Converter={StaticResource DoubleAdjustment}, ConverterParameter=210}" d:Height="800"></TextBox>
                                     <Expander Margin="0"
                                         Header="Respones headers"
