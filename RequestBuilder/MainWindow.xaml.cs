@@ -40,6 +40,13 @@ namespace RequestBuilder
         {
             ViewModel.Width = Width;
             ViewModel.Height = Height;
+            ViewModel.CurrentSession.RequestCompleted += _ =>
+            {
+                Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Loaded, new Action(() =>
+                {
+                    ResponseExpander.BringIntoView();
+                }));
+            };
         }
     }
 }

@@ -15,6 +15,8 @@ namespace RequestBuilder.ViewModels
         private string responseHeaders;
         private string responseString;
         private string status;
+        private bool isLoading;
+        private bool isResponseExpanded;
         private Dispatcher dispatcher;
         private ObservableCollection<string> urls;
 
@@ -22,6 +24,18 @@ namespace RequestBuilder.ViewModels
         {
             this.dispatcher = dispatcher;
             HttpVerb = HttpVerb.Get;
+        }
+
+        public bool IsLoading
+        {
+            get => isLoading;
+            set { isLoading = value; OnPropertyChanged(); }
+        }
+
+        public bool IsResponseExpanded
+        {
+            get => isResponseExpanded;
+            set { isResponseExpanded = value; OnPropertyChanged(); }
         }
 
         public string Status
@@ -147,6 +161,7 @@ namespace RequestBuilder.ViewModels
 
         public Command RunCommand => new Command(async () =>
         {
+            IsLoading = true;
             var capturedUrl = Url;
             var capturedVerb = HttpVerb;
             var capturedHeaders = Headers;
@@ -169,6 +184,8 @@ namespace RequestBuilder.ViewModels
                         responseString += err.StackTrace + "\r\n";
                         err = err.InnerException;
                     }
+                    IsLoading = false;
+                    IsResponseExpanded = true;
                     RequestCompleted?.Invoke(new RequestHistoryItem(capturedUrl, capturedVerb, capturedHeaders, capturedBody,
                         responseString, "", status, 0));
                 });
@@ -220,6 +237,8 @@ namespace RequestBuilder.ViewModels
                 ResponseHeaders = headerSb.ToString();
                 ResponseString = responseText;
                 Status = status;
+                IsLoading = false;
+                IsResponseExpanded = true;
                 RequestCompleted?.Invoke(new RequestHistoryItem(capturedUrl, capturedVerb, capturedHeaders, capturedBody,
                     responseText, headerSb.ToString(), status, (int)result.StatusCode));
             }));

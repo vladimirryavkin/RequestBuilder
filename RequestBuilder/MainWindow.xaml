@@ -11,6 +11,7 @@
         Title="MainWindow" Height="450" Width="800">
     <Window.Resources>
         <Thickness x:Key="ControlMargin">0 5 0 0</Thickness>
+        <BooleanToVisibilityConverter x:Key="BoolToVis"/>
     </Window.Resources>
     <Grid>
         <Grid.ColumnDefinitions>
@@ -70,7 +71,7 @@
                 Header="Request building"
                 UseLayoutRounding="True">
                 <AdornerDecorator>
-                    <ScrollViewer d:Height="900" Height="{Binding Height, Converter={StaticResource DoubleAdjustment}, ConverterParameter=75}">
+                    <ScrollViewer x:Name="MainScrollViewer" d:Height="900" Height="{Binding Height, Converter={StaticResource DoubleAdjustment}, ConverterParameter=75}">
                         <StackPanel>
                             <Expander Margin="0"
                                 Header="Request"
@@ -113,13 +114,31 @@
 
                                     <TextBlock FontSize="30"  Text="Body"/>
                                     <TextBox FontSize="20" Text="{Binding CurrentSession.Body}" AcceptsReturn="True" d:Height="450" MinHeight="450" Height="{Binding Height, Converter={StaticResource DoubleAdjustment}, ConverterParameter=520}"></TextBox>
-                                    <Button FontSize="30"  Content="Run" Command="{Binding CurrentSession.RunCommand}"/>
+                                    <Grid>
+                                        <Button FontSize="30" Content="Run" Command="{Binding CurrentSession.RunCommand}">
+                                            <Button.Style>
+                                                <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding CurrentSession.IsLoading}" Value="True">
+                                                            <Setter Property="IsEnabled" Value="False"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Button.Style>
+                                        </Button>
+                                        <mah:ProgressRing IsActive="{Binding CurrentSession.IsLoading}"
+                                                          Visibility="{Binding CurrentSession.IsLoading, Converter={StaticResource BoolToVis}}"
+                                                          Width="36" Height="36"
+                                                          Foreground="White"
+                                                          IsHitTestVisible="False"/>
+                                    </Grid>
                                 </StackPanel>
                             </Expander>
 
-                            <Expander Margin="0"
+                            <Expander x:Name="ResponseExpander"
+                                Margin="0"
                                 Header="Response"
-                                IsExpanded="False">
+                                IsExpanded="{Binding CurrentSession.IsResponseExpanded, Mode=TwoWay}">
                                 <StackPanel>
                                     <StackPanel Orientation="Horizontal">
                                         <TextBlock FontSize="30"  Text="{Binding CurrentSession.Status}"/>
