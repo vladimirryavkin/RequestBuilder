@@ -38,7 +38,7 @@ namespace RequestBuilder
             {
                 if (ex.Response == null)
                     throw;
-                //!info.ProceedOnError || 
+
                 var code = (int)((HttpWebResponse)ex.Response).StatusCode;
                 if (!(code >= 300 && code < 400) && !info.ProceedOnError)
                 {

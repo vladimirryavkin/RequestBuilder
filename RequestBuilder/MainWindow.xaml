@@ -112,8 +112,134 @@
                                         </TextBox>
                                     </mah:MetroHeader>
 
-                                    <TextBlock FontSize="30"  Text="Body"/>
-                                    <TextBox FontSize="20" Text="{Binding CurrentSession.Body}" AcceptsReturn="True" d:Height="450" MinHeight="450" Height="{Binding Height, Converter={StaticResource DoubleAdjustment}, ConverterParameter=520}"></TextBox>
+                                    <TextBlock FontSize="30" Text="Body"/>
+                                    <TabControl SelectedIndex="{Binding CurrentSession.BodyModeIndex, Mode=TwoWay}" Margin="0 4 0 0">
+                                        <TabItem Header="Raw">
+                                            <TextBox FontSize="20"
+                                                     Text="{Binding CurrentSession.Body, UpdateSourceTrigger=PropertyChanged}"
+                                                     AcceptsReturn="True"
+                                                     MinHeight="420"
+                                                     VerticalScrollBarVisibility="Auto"/>
+                                        </TabItem>
+                                        <TabItem Header="application/x-www-form-urlencoded">
+                                            <Grid MinHeight="420">
+                                                <ScrollViewer VerticalScrollBarVisibility="Auto"
+                                                              Visibility="{Binding CurrentSession.IsFormBodyParsable, Converter={StaticResource BoolToVis}}">
+                                                    <StackPanel Margin="4 6">
+                                                        <Grid Margin="0 0 0 4">
+                                                            <Grid.ColumnDefinitions>
+                                                                <ColumnDefinition Width="*"/>
+                                                                <ColumnDefinition Width="*"/>
+                                                                <ColumnDefinition Width="30"/>
+                                                            </Grid.ColumnDefinitions>
+                                                            <TextBlock Text="Key" FontWeight="SemiBold" Margin="2 0"/>
+                                                            <TextBlock Text="Value" Grid.Column="1" FontWeight="SemiBold" Margin="2 0"/>
+                                                        </Grid>
+                                                        <ItemsControl ItemsSource="{Binding CurrentSession.FormParams}">
+                                                            <ItemsControl.ItemTemplate>
+                                                                <DataTemplate>
+                                                                    <Grid Margin="0 2">
+                                                                        <Grid.ColumnDefinitions>
+                                                                            <ColumnDefinition Width="*"/>
+                                                                            <ColumnDefinition Width="*"/>
+                                                                            <ColumnDefinition Width="30"/>
+                                                                        </Grid.ColumnDefinitions>
+                                                                        <TextBox Text="{Binding Key, UpdateSourceTrigger=PropertyChanged}" Margin="0 0 4 0"/>
+                                                                        <TextBox Text="{Binding Value, UpdateSourceTrigger=PropertyChanged}" Grid.Column="1" Margin="0 0 4 0"/>
+                                                                        <Button Grid.Column="2" Content="✕" Padding="0"
+                                                                                Command="{Binding DataContext.CurrentSession.RemoveFormParamCommand, RelativeSource={RelativeSource AncestorType=mah:MetroWindow}}"
+                                                                                CommandParameter="{Binding}"/>
+                                                                    </Grid>
+                                                                </DataTemplate>
+                                                            </ItemsControl.ItemTemplate>
+                                                        </ItemsControl>
+                                                        <Button Content="+ Add parameter"
+                                                                Command="{Binding CurrentSession.AddFormParamCommand}"
+                                                                HorizontalAlignment="Left"
+                                                                Margin="0 6 0 0"/>
+                                                    </StackPanel>
+                                                </ScrollViewer>
+                                                <StackPanel Margin="4 6" VerticalAlignment="Top"
+                                                            Visibility="{Binding CurrentSession.IsFormBodyUnparsable, Converter={StaticResource BoolToVis}}">
+                                                    <TextBlock Text="The Raw body isn't valid application/x-www-form-urlencoded content, so it can't be shown as fields here."
+                                                               TextWrapping="Wrap"/>
+                                                    <TextBlock Text="Resetting will clear the Raw body and let you build a form from scratch."
+                                                               TextWrapping="Wrap" Opacity="0.7" Margin="0 4 0 0"/>
+                                                    <Button Content="Reset body"
+                                                            Command="{Binding CurrentSession.ResetFormBodyCommand}"
+                                                            HorizontalAlignment="Left"
+                                                            Margin="0 10 0 0"/>
+                                                </StackPanel>
+                                            </Grid>
+                                        </TabItem>
+                                        <TabItem Header="multipart/form-data">
+                                            <Grid MinHeight="420">
+                                                <ScrollViewer VerticalScrollBarVisibility="Auto"
+                                                              Visibility="{Binding CurrentSession.IsMultipartBodyParsable, Converter={StaticResource BoolToVis}}">
+                                                    <StackPanel Margin="4 6">
+                                                        <Grid Margin="0 0 0 4">
+                                                            <Grid.ColumnDefinitions>
+                                                                <ColumnDefinition Width="*"/>
+                                                                <ColumnDefinition Width="2*"/>
+                                                                <ColumnDefinition Width="30"/>
+                                                            </Grid.ColumnDefinitions>
+                                                            <TextBlock Text="Key" FontWeight="SemiBold" Margin="2 0"/>
+                                                            <TextBlock Text="Value / File" Grid.Column="1" FontWeight="SemiBold" Margin="2 0"/>
+                                                        </Grid>
+                                                        <ItemsControl ItemsSource="{Binding CurrentSession.MultipartParams}">
+                                                            <ItemsControl.ItemTemplate>
+                                                                <DataTemplate>
+                                                                    <Grid Margin="0 2">
+                                                                        <Grid.ColumnDefinitions>
+                                                                            <ColumnDefinition Width="*"/>
+                                                                            <ColumnDefinition Width="2*"/>
+                                                                            <ColumnDefinition Width="30"/>
+                                                                        </Grid.ColumnDefinitions>
+                                                                        <TextBox Text="{Binding Key, UpdateSourceTrigger=PropertyChanged}" Margin="0 0 4 0"/>
+                                                                        <TextBox Grid.Column="1" Margin="0 0 4 0"
+                                                                                 Text="{Binding TextValue, UpdateSourceTrigger=PropertyChanged}"
+                                                                                 Visibility="{Binding IsText, Converter={StaticResource BoolToVis}}"/>
+                                                                        <Grid Grid.Column="1" Margin="0 0 4 0"
+                                                                              Visibility="{Binding IsFile, Converter={StaticResource BoolToVis}}">
+                                                                            <Grid.ColumnDefinitions>
+                                                                                <ColumnDefinition Width="*"/>
+                                                                                <ColumnDefinition Width="Auto"/>
+                                                                            </Grid.ColumnDefinitions>
+                                                                            <TextBox Text="{Binding FilePath, UpdateSourceTrigger=PropertyChanged}"/>
+                                                                            <Button Grid.Column="1" Content="Browse..." Margin="4 0 0 0"
+                                                                                    Command="{Binding DataContext.CurrentSession.BrowseFileCommand, RelativeSource={RelativeSource AncestorType=mah:MetroWindow}}"
+                                                                                    CommandParameter="{Binding}"/>
+                                                                        </Grid>
+                                                                        <Button Grid.Column="2" Content="✕" Padding="0"
+                                                                                Command="{Binding DataContext.CurrentSession.RemoveMultipartParamCommand, RelativeSource={RelativeSource AncestorType=mah:MetroWindow}}"
+                                                                                CommandParameter="{Binding}"/>
+                                                                    </Grid>
+                                                                </DataTemplate>
+                                                            </ItemsControl.ItemTemplate>
+                                                        </ItemsControl>
+                                                        <StackPanel Orientation="Horizontal" Margin="0 6 0 0">
+                                                            <Button Content="+ Text field"
+                                                                    Command="{Binding CurrentSession.AddMultipartTextParamCommand}"
+                                                                    Margin="0 0 6 0"/>
+                                                            <Button Content="+ File"
+                                                                    Command="{Binding CurrentSession.AddMultipartFileParamCommand}"/>
+                                                        </StackPanel>
+                                                    </StackPanel>
+                                                </ScrollViewer>
+                                                <StackPanel Margin="4 6" VerticalAlignment="Top"
+                                                            Visibility="{Binding CurrentSession.IsMultipartBodyUnparsable, Converter={StaticResource BoolToVis}}">
+                                                    <TextBlock Text="The Raw body isn't valid multipart/form-data content, so it can't be shown as fields here."
+                                                               TextWrapping="Wrap"/>
+                                                    <TextBlock Text="Resetting will clear the Raw body and let you build a multipart form from scratch."
+                                                               TextWrapping="Wrap" Opacity="0.7" Margin="0 4 0 0"/>
+                                                    <Button Content="Reset body"
+                                                            Command="{Binding CurrentSession.ResetMultipartBodyCommand}"
+                                                            HorizontalAlignment="Left"
+                                                            Margin="0 10 0 0"/>
+                                                </StackPanel>
+                                            </Grid>
+                                        </TabItem>
+                                    </TabControl>
                                     <Grid>
                                         <Button FontSize="30" Content="Run" Command="{Binding CurrentSession.RunCommand}">
                                             <Button.Style>
