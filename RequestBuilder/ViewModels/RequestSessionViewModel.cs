@@ -6,10 +6,11 @@ using System.Text.RegularExpressions;
 using System.Windows.Threading;
 using Microsoft.Win32;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 
 namespace RequestBuilder.ViewModels
 {
-    public enum BodyMode { Raw, FormUrlEncoded, Multipart }
+    public enum BodyMode { Raw, FormUrlEncoded, Multipart, Json }
 
     public class RequestSessionViewModel : BaseViewModel
     {
@@ -30,6 +31,8 @@ namespace RequestBuilder.ViewModels
         private string boundary;
         private bool isFormBodyUnparsable;
         private bool isMultipartBodyUnparsable;
+        private JObject jsonBody;
+        private bool isJsonBodyUnparsable;
 
         public RequestSessionViewModel(Dispatcher dispatcher)
         {
@@ -154,6 +157,30 @@ namespace RequestBuilder.ViewModels
         /// <summary>Inverse of <see cref="IsMultipartBodyUnparsable"/>, for Visibility bindings.</summary>
         public bool IsMultipartBodyParsable => !IsMultipartBodyUnparsable;
 
+        /// <summary>
+        /// The Raw body parsed as a JSON object, for the application/json tab's JsonTreeView. Only
+        /// re-parsed when switching into Json mode - live edits are pushed back via SyncJsonBodyToRaw
+        /// without touching this property, so the tree view is never rebuilt out from under the user.
+        /// </summary>
+        public JObject JsonBody
+        {
+            get => jsonBody;
+            private set { jsonBody = value; OnPropertyChanged(); }
+        }
+
+        /// <summary>
+        /// True when the current Raw body could not be parsed as a JSON object.
+        /// While true, the JsonTreeView is not shown; the UI should offer "Reset body" instead.
+        /// </summary>
+        public bool IsJsonBodyUnparsable
+        {
+            get => isJsonBodyUnparsable;
+            private set { isJsonBodyUnparsable = value; OnPropertyChanged(); OnPropertyChanged(nameof(IsJsonBodyParsable)); }
+        }
+
+        /// <summary>Inverse of <see cref="IsJsonBodyUnparsable"/>, for Visibility bindings.</summary>
+        public bool IsJsonBodyParsable => !IsJsonBodyUnparsable;
+
         private static string GenerateBoundary() => $"----FormBoundary{Guid.NewGuid():N}";
 
         // The Raw tab is the primary/source-of-truth representation of the body. The other tabs are
@@ -171,6 +198,50 @@ namespace RequestBuilder.ViewModels
                 TrySetupFormMode();
             else if (newMode == BodyMode.Multipart)
                 TrySetupMultipartMode();
+            else if (newMode == BodyMode.Json)
+                TrySetupJsonMode();
+        }
+
+        private void TrySetupJsonMode()
+        {
+            var raw = Body ?? "";
+            if (string.IsNullOrWhiteSpace(raw))
+            {
+                IsJsonBodyUnparsable = false;
+                JsonBody = new JObject();
+                SetHeader("Content-Type: application/json");
+                return;
+            }
+
+            JToken token = null;
+            try { token = JToken.Parse(raw); }
+            catch (JsonException) { }
+
+            if (token is JObject obj)
+            {
+                IsJsonBodyUnparsable = false;
+                JsonBody = obj;
+                SetHeader("Content-Type: application/json");
+                return;
+            }
+
+            IsJsonBodyUnparsable = true;
+            JsonBody = null;
+        }
+
+        public Command ResetJsonBodyCommand => new Command(() =>
+        {
+            Body = "";
+            JsonBody = new JObject();
+            IsJsonBodyUnparsable = false;
+            SetHeader("Content-Type: application/json");
+        });
+
+        /// <summary>Called by the host after every edit inside the JsonTreeView to keep the Raw body in sync.</summary>
+        public void SyncJsonBodyToRaw(JObject json)
+        {
+            if (json == null) return;
+            Body = json.ToString(Formatting.Indented);
         }
 
         private void TrySetupFormMode()

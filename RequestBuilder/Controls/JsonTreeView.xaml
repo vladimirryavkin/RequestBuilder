@@ -1,0 +1,93 @@
+<UserControl x:Class="RequestBuilder.Controls.JsonTreeView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:vm="clr-namespace:RequestBuilder.ViewModels"
+             mc:Ignorable="d"
+             d:DesignHeight="450" d:DesignWidth="600">
+    <UserControl.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVis"/>
+
+        <Style x:Key="NodeRowStyle" TargetType="Border">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Padding" Value="2 1"/>
+            <Setter Property="ContextMenu">
+                <Setter.Value>
+                    <ContextMenu/>
+                </Setter.Value>
+            </Setter>
+            <EventSetter Event="MouseLeftButtonDown" Handler="Row_MouseLeftButtonDown"/>
+            <EventSetter Event="ContextMenuOpening" Handler="Row_ContextMenuOpening"/>
+            <EventSetter Event="Loaded" Handler="Row_Loaded"/>
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                    <Setter Property="Background" Value="#332B88D8"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="InlineEditorStyle" TargetType="TextBox">
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="MinWidth" Value="16"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+
+        <!-- Implicit (keyless) template: matched automatically by DataType wherever a JsonNodeViewModel
+             needs rendering, including recursively from the ItemsControl below. A keyed template with a
+             StaticResource self-reference does NOT reliably resolve here (deferred-content load ordering),
+             so this must stay keyless. -->
+        <DataTemplate DataType="{x:Type vm:JsonNodeViewModel}">
+            <StackPanel>
+                <Border Style="{StaticResource NodeRowStyle}">
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <TextBlock Text="&quot;" Visibility="{Binding HasName, Converter={StaticResource BoolToVis}}"/>
+                        <TextBox Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}"
+                                 Style="{StaticResource InlineEditorStyle}"
+                                 Visibility="{Binding HasName, Converter={StaticResource BoolToVis}}"
+                                 Loaded="Editor_Loaded"/>
+                        <TextBlock Text="&quot;: " Visibility="{Binding HasName, Converter={StaticResource BoolToVis}}"/>
+
+                        <TextBlock Text="{}{" FontWeight="Bold" Visibility="{Binding IsObject, Converter={StaticResource BoolToVis}}"/>
+                        <TextBlock Text="[" FontWeight="Bold" Visibility="{Binding IsArray, Converter={StaticResource BoolToVis}}"/>
+
+                        <TextBox Text="{Binding StringValue, UpdateSourceTrigger=PropertyChanged}"
+                                 Style="{StaticResource InlineEditorStyle}"
+                                 Visibility="{Binding IsString, Converter={StaticResource BoolToVis}}"
+                                 Loaded="Editor_Loaded"/>
+                        <TextBox Text="{Binding StringValue, UpdateSourceTrigger=PropertyChanged}"
+                                 Style="{StaticResource InlineEditorStyle}"
+                                 Visibility="{Binding IsNumber, Converter={StaticResource BoolToVis}}"
+                                 Loaded="Editor_Loaded"/>
+                        <CheckBox IsChecked="{Binding BoolValue}"
+                                  VerticalAlignment="Center"
+                                  Visibility="{Binding IsBoolean, Converter={StaticResource BoolToVis}}"
+                                  Loaded="Editor_Loaded"/>
+                        <TextBlock Text="null" FontStyle="Italic" Opacity="0.6"
+                                   Visibility="{Binding IsNull, Converter={StaticResource BoolToVis}}"/>
+
+                        <TextBlock Text="," Visibility="{Binding ShowLeafComma, Converter={StaticResource BoolToVis}}"/>
+                    </StackPanel>
+                </Border>
+
+                <ItemsControl ItemsSource="{Binding Children}"
+                              Margin="20 0 0 0"
+                              Visibility="{Binding IsContainer, Converter={StaticResource BoolToVis}}"/>
+
+                <StackPanel Orientation="Horizontal" Visibility="{Binding IsContainer, Converter={StaticResource BoolToVis}}">
+                    <TextBlock Text="}" FontWeight="Bold" Visibility="{Binding IsObject, Converter={StaticResource BoolToVis}}"/>
+                    <TextBlock Text="]" FontWeight="Bold" Visibility="{Binding IsArray, Converter={StaticResource BoolToVis}}"/>
+                    <TextBlock Text="," Visibility="{Binding ShowClosingComma, Converter={StaticResource BoolToVis}}"/>
+                </StackPanel>
+            </StackPanel>
+        </DataTemplate>
+    </UserControl.Resources>
+
+    <Grid Background="Transparent">
+        <ContentPresenter x:Name="RootPresenter"
+                           TextElement.FontFamily="Consolas"
+                           TextElement.FontSize="14"/>
+    </Grid>
+</UserControl>

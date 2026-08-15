@@ -47,6 +47,7 @@ namespace RequestBuilder
                     ResponseExpander.BringIntoView();
                 }));
             };
+            JsonTreeControl.Changed += () => ViewModel.CurrentSession.SyncJsonBodyToRaw(JsonTreeControl.GetJson());
         }
     }
 }

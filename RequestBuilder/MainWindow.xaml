@@ -8,6 +8,7 @@
         mc:Ignorable="d"
         xmlns:mah="clr-namespace:MahApps.Metro.Controls;assembly=MahApps.Metro"
         xmlns:ViewModels ="clr-namespace:RequestBuilder.ViewModels"
+        xmlns:Controls="clr-namespace:RequestBuilder.Controls"
         Title="MainWindow" Height="450" Width="800">
     <Window.Resources>
         <Thickness x:Key="ControlMargin">0 5 0 0</Thickness>
@@ -234,6 +235,27 @@
                                                                TextWrapping="Wrap" Opacity="0.7" Margin="0 4 0 0"/>
                                                     <Button Content="Reset body"
                                                             Command="{Binding CurrentSession.ResetMultipartBodyCommand}"
+                                                            HorizontalAlignment="Left"
+                                                            Margin="0 10 0 0"/>
+                                                </StackPanel>
+                                            </Grid>
+                                        </TabItem>
+                                        <TabItem Header="application/json">
+                                            <Grid MinHeight="420">
+                                                <ScrollViewer VerticalScrollBarVisibility="Auto"
+                                                              Visibility="{Binding CurrentSession.IsJsonBodyParsable, Converter={StaticResource BoolToVis}}">
+                                                    <Controls:JsonTreeView x:Name="JsonTreeControl"
+                                                                           Margin="4 6"
+                                                                           DataContext="{Binding CurrentSession.JsonBody}"/>
+                                                </ScrollViewer>
+                                                <StackPanel Margin="4 6" VerticalAlignment="Top"
+                                                            Visibility="{Binding CurrentSession.IsJsonBodyUnparsable, Converter={StaticResource BoolToVis}}">
+                                                    <TextBlock Text="The Raw body isn't valid JSON (or isn't a JSON object), so it can't be shown as a tree here."
+                                                               TextWrapping="Wrap"/>
+                                                    <TextBlock Text="Resetting will clear the Raw body and let you build a JSON object from scratch."
+                                                               TextWrapping="Wrap" Opacity="0.7" Margin="0 4 0 0"/>
+                                                    <Button Content="Reset body"
+                                                            Command="{Binding CurrentSession.ResetJsonBodyCommand}"
                                                             HorizontalAlignment="Left"
                                                             Margin="0 10 0 0"/>
                                                 </StackPanel>
