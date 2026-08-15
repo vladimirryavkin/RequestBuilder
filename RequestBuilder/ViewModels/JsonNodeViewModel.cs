@@ -265,6 +265,37 @@ namespace RequestBuilder.ViewModels
             return child;
         }
 
+        /// <summary>
+        /// Array-only: adds a new object element scaffolded with the properties common to every other
+        /// object element already in this array (names + types, default/empty values) - a ready-made
+        /// shape matching the array's existing objects rather than a blank {}.
+        /// </summary>
+        public JsonNodeViewModel AddCommonObjectChild()
+        {
+            if (!IsArray) return null;
+
+            var objectSiblings = Children.Where(c => c.IsObject).ToList();
+            var common = new JsonNodeViewModel(Context, JsonNodeKind.Object, null, this);
+
+            if (objectSiblings.Count > 0)
+            {
+                var commonNames = objectSiblings
+                    .Select(o => new HashSet<string>(o.Children.Select(c => c.Name)))
+                    .Aggregate((a, b) => { a.IntersectWith(b); return a; });
+
+                foreach (var propName in objectSiblings[0].Children.Select(c => c.Name).Where(commonNames.Contains))
+                {
+                    var template = objectSiblings[0].Children.First(c => c.Name == propName);
+                    common.Children.Add(new JsonNodeViewModel(Context, template.Kind, propName, common,
+                        template.Kind == JsonNodeKind.Number ? "0" : ""));
+                }
+            }
+
+            Children.Add(common);
+            NotifyChanged();
+            return common;
+        }
+
         private string GenerateUniquePropertyName()
         {
             var existing = new HashSet<string>(Children.Select(c => c.Name));

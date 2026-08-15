@@ -106,6 +106,8 @@ namespace RequestBuilder.Controls
                 AddMenuItem(menu, "Add null element", () => node.AddChild(JsonNodeKind.Null));
                 AddMenuItem(menu, "Add boolean element", () => node.AddChild(JsonNodeKind.Boolean));
                 AddMenuItem(menu, "Add array element", () => node.AddChild(JsonNodeKind.Array));
+                AddMenuItem(menu, "Add object element", () => node.AddChild(JsonNodeKind.Object));
+                AddMenuItem(menu, "Add common object", () => node.AddCommonObjectChild());
                 menu.Items.Add(new Separator());
                 AddMenuItem(menu, "Delete array", node.Delete);
                 AddMenuItem(menu, "Clear all values", node.ClearValues);
