@@ -7,10 +7,9 @@ using System.Text;
 using System.Threading.Tasks;
 namespace RequestBuilder {
     public class FileSystemHelper {
-        private const String MedyearDir = "MedyearDir";
-        private const String FallbackContentType = "application/octet-stream";
+        private const string FallbackContentType = "application/octet-stream";
         #region [ ContentType mappings ]
-        private static Dictionary<String, String> ContentTypes = new Dictionary<String, String> {
+        private static readonly Dictionary<string, string> ContentTypes = new Dictionary<string, string> {
             {".123", "application/vnd.lotus-1-2-3"},
             {".3dml", "text/vnd.in3d.3dml"},
             {".3g2", "video/3gpp2"},
@@ -696,16 +695,17 @@ namespace RequestBuilder {
             {".zmm", "application/vnd.handheld-entertainment+xml"}
         };
         #endregion
-        public String GetSystemDrive() {
+        public string GetSystemDrive() {
             return Directory.GetDirectoryRoot(Environment.GetFolderPath(Environment.SpecialFolder.System));
         }
-        public String GetTempDirectory() {
+        public string GetTempDirectory() {
             return Path.GetTempPath();
         }
-        public String GetUserAppDataDirectory() {
+        public string GetUserAppDataDirectory(string appName) {
             var appDataDir = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-            return Path.Combine(appDataDir, MedyearDir);
+            return Path.Combine(appDataDir, appName);
         }
+
         public void Enumerate(string folder, string pattern, Action<IEnumerable<FileInfo>> action) {
             try {
                 var info = new DirectoryInfo(folder);
@@ -719,10 +719,11 @@ namespace RequestBuilder {
                 } catch (Exception) { }
             } catch (Exception) { }
         }
-        public String Combine(String beginning, params String[] endings) {
+
+        public string Combine(string beginning, params string[] endings) {
             if (endings.Any(x => x == null))
                 throw new ArgumentNullException("Endings cannot be null");
-            var res = new String[endings.Length + 1];
+            var res = new string[endings.Length + 1];
             res[0] = beginning;
             for (var i = 0; i < endings.Length; i++)
                 if (endings[i].StartsWith("\\"))
@@ -731,16 +732,16 @@ namespace RequestBuilder {
                     res[i + 1] = endings[i];
             return Path.Combine(res);
         }
-        public String GetContainingFolder(String file) {
-            if (String.IsNullOrWhiteSpace(file))
+        public string GetContainingFolder(string file) {
+            if (string.IsNullOrWhiteSpace(file))
                 throw new ArgumentNullException("file");
             var lastIndex = file.LastIndexOf('\\');
             return file.Substring(0, lastIndex);
         }
-        public String SubtractTheBeginning(String beginning, String fullPath) {
-            if (String.IsNullOrWhiteSpace(beginning))
+        public string SubtractTheBeginning(string beginning, string fullPath) {
+            if (string.IsNullOrWhiteSpace(beginning))
                 throw new ArgumentNullException("beginning");
-            if (String.IsNullOrWhiteSpace(fullPath))
+            if (string.IsNullOrWhiteSpace(fullPath))
                 throw new ArgumentNullException("fullPath");
             if (!fullPath.StartsWith(beginning))
                 throw new InvalidOperationException("Beginnings are different");
@@ -749,8 +750,8 @@ namespace RequestBuilder {
                 res = res.TrimStart('\\');
             return res;
         }
-        public void DeleteDirectory(String dirName) {
-            if (String.IsNullOrWhiteSpace(dirName))
+        public void DeleteDirectory(string dirName) {
+            if (string.IsNullOrWhiteSpace(dirName))
                 throw new ArgumentNullException("dirName");
             if (!Directory.Exists(dirName))
                 throw new DirectoryNotFoundException("Directory " + dirName + " is not found");
@@ -761,34 +762,39 @@ namespace RequestBuilder {
                 DeleteDirectory(info);
             }
         }
-        public long FileSize(String fileName) {
+
+        public long FileSize(string fileName) {
             if (!File.Exists(fileName))
                 throw new FileNotFoundException(fileName + " not found");
             var file = new FileInfo(fileName);
             return file.Length;
         }
-        public FileStream OpenOrCreateFile(String fileName, FileMode mode = FileMode.OpenOrCreate, FileAccess access = FileAccess.ReadWrite) {
+        public FileStream OpenOrCreateFile(string fileName, FileMode mode = FileMode.OpenOrCreate, FileAccess access = FileAccess.ReadWrite) {
             CreateDir(fileName);
             return new FileStream(fileName, mode, access);
         }
-        public void DeleteFileSafe(String fileName) {
+        public bool DeleteFileSafe(string fileName) {
             if (File.Exists(fileName))
+            {
                 File.Delete(fileName);
+                return true;
+            }
+            return false;
         }
-        public void Copy(String sourceFile, String targetFile) {
-            if (String.IsNullOrWhiteSpace(targetFile))
+        public void Copy(string sourceFile, string targetFile) {
+            if (string.IsNullOrWhiteSpace(targetFile))
                 throw new ArgumentNullException("targetFile");
-            if (String.IsNullOrWhiteSpace(sourceFile))
+            if (string.IsNullOrWhiteSpace(sourceFile))
                 throw new ArgumentNullException("sourceFile");
             if (!File.Exists(sourceFile))
                 throw new FileNotFoundException();
             CreateDir(targetFile);
             File.Copy(sourceFile, targetFile);
         }
-        public bool EntryExists(String fullPath) {
+        public bool EntryExists(string fullPath) {
             return Directory.Exists(fullPath) || File.Exists(fullPath);
         }
-        public void CopyFileOrDir(String source, String target) {
+        public void CopyFileOrDir(string source, string target) {
             Guard.PropertyNotNullOrEmpty(source, nameof(source));
             Guard.PropertyNotNullOrEmpty(target, nameof(target));
             if (GetEntryType(source) == FsEntryType.File)
@@ -796,28 +802,28 @@ namespace RequestBuilder {
             else if (GetEntryType(source) == FsEntryType.Directory)
                 Directory.CreateDirectory(target);
         }
-        public FsEntryType GetEntryType(String target) {
+        public FsEntryType GetEntryType(string target) {
             if (Directory.Exists(target) && !File.Exists(target))
                 return FsEntryType.Directory;
             else if (!Directory.Exists(target) && File.Exists(target))
                 return FsEntryType.File;
             throw new NotFoundException("Entry " + target + " not found");
         }
-        public String ExtractLastNodeFs(String fullPath) {
+        public string ExtractLastNodeFs(string fullPath) {
             return ExtractLastNode(fullPath, '\\');
         }
-        public String ExtractLastNodeStorage(String fullPath) {
+        public string ExtractLastNodeStorage(string fullPath) {
             return ExtractLastNode(fullPath, '/');
         }
-        public String[] ExtractPartsFromWeb(String input) {
+        public string[] ExtractPartsFromWeb(string input) {
             return ExtractParts(input, '/');
         }
-        public String ToWebPath(String localPath) {
+        public string ToWebPath(string localPath) {
             if (localPath == null)
                 throw new ArgumentNullException("localPath");
             return localPath.Replace('\\', '/');
         }
-        public String GetContentType(String fileName) {
+        public string GetContentType(string fileName) {
             Guard.PropertyNotNullOrEmpty(fileName, "fileName");
             var li = fileName.LastIndexOf('.');
             if (li == -1)
@@ -827,16 +833,17 @@ namespace RequestBuilder {
                 return ContentTypes[ext];
             return FallbackContentType;
         }
-        private String[] ExtractParts(String input, Char targetChar) {
+
+        private string[] ExtractParts(string input, char targetchar) {
             Guard.PropertyNotNullOrEmpty(input, "input");
-            return input.Split(new[] { targetChar }, StringSplitOptions.RemoveEmptyEntries)
-                 .Where(x => !String.IsNullOrWhiteSpace(x))
+            return input.Split([targetchar], StringSplitOptions.RemoveEmptyEntries)
+                 .Where(x => !string.IsNullOrWhiteSpace(x))
                  .ToArray();
         }
-        private String ExtractLastNode(String fullPath, char targetChar) {
-            if (String.IsNullOrEmpty(fullPath))
+        private string ExtractLastNode(string fullPath, char targetchar) {
+            if (string.IsNullOrEmpty(fullPath))
                 throw new ArgumentNullException("fullPath");
-            var lastIndex = fullPath.LastIndexOf(targetChar);
+            var lastIndex = fullPath.LastIndexOf(targetchar);
             return fullPath.Substring(lastIndex + 1);
         }
         private void DeleteDirectory(DirectoryInfo info) {
@@ -848,7 +855,7 @@ namespace RequestBuilder {
                 f.Delete();
             info.Delete(true);
         }
-        private static void CreateDir(String targetFile) {
+        private static void CreateDir(string targetFile) {
             var targetDir = targetFile.Substring(0, targetFile.LastIndexOf('\\'));
             if (!Directory.Exists(targetDir))
                 Directory.CreateDirectory(targetDir);

@@ -6,9 +6,7 @@ using System.Text;
 using System.Text.RegularExpressions;
 using System.Xml.Linq;
 using System.Linq;
-using System.Runtime.Serialization.Formatters.Binary;
 using System.IO;
-using System.Data;
 using RequestBuilder.Errors;
 
 namespace RequestBuilder

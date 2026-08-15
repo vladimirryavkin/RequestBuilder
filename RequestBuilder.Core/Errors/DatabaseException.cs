@@ -1,10 +1,8 @@
 using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Runtime.Serialization;
-using System.Text;
 
-namespace RequestBuilder.Errors {
+namespace RequestBuilder.Errors
+{
     [Serializable]
     public class DatabaseException : BaseException {
         public DatabaseException() { }

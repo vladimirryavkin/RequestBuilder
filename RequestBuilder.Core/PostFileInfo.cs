@@ -5,13 +5,16 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-namespace RequestBuilder {
-    public class PostFileInfo : IMultipartParameter {
-        public String ContentType { get; private set; }
-        public String FileName { get; private set; }
+namespace RequestBuilder
+{
+    public class PostFileInfo : IMultipartParameter
+    {
+        public string ContentType { get; private set; }
+        public string FileName { get; private set; }
         public byte[] Data { get; private set; }
-        public String ParamName { get; private set; }
-        public PostFileInfo(Stream data, String fileName, String paramName, String contentType) {
+        public string ParamName { get; private set; }
+        public PostFileInfo(Stream data, String fileName, String paramName, String contentType)
+        {
             Guard.ParamNotNull(data, "data");
             Guard.PropertyNotNullOrEmpty(fileName, "fileName");
             Guard.PropertyNotNullOrEmpty(paramName, "paramName");
@@ -20,13 +23,14 @@ namespace RequestBuilder {
             Data = data.Read();
             FileName = fileName;
             ParamName = paramName;
-            if (String.IsNullOrWhiteSpace(contentType))
+            if (string.IsNullOrWhiteSpace(contentType))
                 DetectContentType();
             else
                 ContentType = contentType;
         }
         public PostFileInfo(Stream data, String fileName, String paramName) : this(data, fileName, paramName, null) { }
-        public PostFileInfo(byte[] data, String fileName, String paramName, String contentType) {
+        public PostFileInfo(byte[] data, String fileName, String paramName, String contentType)
+        {
             Guard.ParamNotNull(data, "data");
             Guard.PropertyNotNullOrEmpty(fileName, "fileName");
             Guard.PropertyNotNullOrEmpty(paramName, "paramName");
@@ -39,13 +43,16 @@ namespace RequestBuilder {
                 ContentType = contentType;
         }
         public PostFileInfo(byte[] data, String fileName, String paramName) : this(data, fileName, paramName, null) { }
-        private void DetectContentType() {
-            if (!String.IsNullOrWhiteSpace(FileName)) {
+        private void DetectContentType()
+        {
+            if (!string.IsNullOrWhiteSpace(FileName))
+            {
                 var helper = new FileSystemHelper();
                 ContentType = helper.GetContentType(FileName);
             }
         }
-        byte[] IMultipartParameter.Value {
+        byte[] IMultipartParameter.Value
+        {
             get { return Data; }
         }
     }

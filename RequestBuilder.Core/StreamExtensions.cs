@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.IO;
 using System.Text;
 using System.Linq;
+using System.Threading.Tasks;
+
 namespace RequestBuilder
 {
     public static class StreamExtensions
@@ -49,6 +51,23 @@ namespace RequestBuilder
             if (data == null)
                 throw new NullReferenceException();
             return Convert.ToBase64String(data);
+        }
+
+        public static string ToBase16(this byte[] data)
+        {
+            return BitConverter.ToString(data).Replace("-", "");
+        }
+
+        public static byte[] FromBase16(this string data)
+        {
+            var outputLength = data.Length / 2;
+            var output = new byte[outputLength];
+            using (var sr = new StringReader(data))
+            {
+                for (var i = 0; i < outputLength; i++)
+                    output[i] = Convert.ToByte(new string(new char[2] { (char)sr.Read(), (char)sr.Read() }), 16);
+            }
+            return output;
         }
 
         public static string Base64ToUrlBase64(this string base64)
@@ -138,6 +157,32 @@ namespace RequestBuilder
                 source.Position = position;
             return bytes;
         }
+
+        public static async Task<byte[]> ReadAsync(this Stream source)
+        {
+            if (source == null)
+                throw new NullReferenceException();
+            var position = 0L;
+            if (source.CanSeek)
+            {
+                position = source.Position;
+                source.Position = 0;
+            }
+            var bytes = (byte[])null;
+            if (!source.CanSeek)
+            {
+                var chunk = await NonSeekableAsync(source);
+                bytes = chunk.ToArray();
+            }
+            else
+            {
+                bytes = new byte[source.Length];
+                source.Read(bytes, 0, bytes.Length);
+            }
+            if (source.CanSeek)
+                source.Position = position;
+            return bytes;
+        }
         public static byte[] Read(this Stream source)
         {
             if (source == null)
@@ -209,7 +254,7 @@ namespace RequestBuilder
         {
             Guard.ParamNotNull(data, "data");
             var count = 0;
-            for (int nPosition = 0; nPosition < data.Length; nPosition++)
+            for (var nPosition = 0; nPosition < data.Length; nPosition++)
             {
                 int a = data[nPosition];
 
@@ -238,6 +283,23 @@ namespace RequestBuilder
             } while (lastRead == bufferSize);
             return bytes;
         }
+
+        private static async Task<List<byte>> NonSeekableAsync(Stream source)
+        {
+            var bytes = new List<byte>();
+            var readCount = 0;
+            var lastRead = 0;
+            var bufferSize = 4096;
+            do
+            {
+                var buff = new byte[bufferSize];
+                lastRead = await source.ReadAsync(buff, 0, bufferSize);
+                bytes.AddRange(buff.Take(lastRead));
+                readCount += lastRead;
+            } while (lastRead == bufferSize);
+            return bytes;
+        }
+
         private static void WriteToStream(this FileStream source, String text, bool truncate = false)
         {
             if (source == null)

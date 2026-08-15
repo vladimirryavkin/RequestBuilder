@@ -4,234 +4,178 @@ using System.IO;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
-using System.Net.Mail;
+using System.Net.Http.Headers;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
-using System.Web;
+
 namespace RequestBuilder
 {
     public class NetworkHelper2
     {
-        private readonly string UserAgent;
+        private readonly string _defaultUserAgent;
 
-        public NetworkHelper2(string userAgent)
+        public NetworkHelper2(string defaultUserAgent = "RequestBuilder-HttpClient")
         {
-            Guard.PropertyNotNullOrEmpty(userAgent, "userAgent");
-            UserAgent = userAgent;
+            _defaultUserAgent = defaultUserAgent;
         }
 
-        public HttpResponse MakeRemoteRequest(HttpRequest info)
+        public async Task<HttpResponse> MakeRemoteRequestAsync(string url, CancellationToken cancellationToken)
         {
-            Guard.ParamNotNull(info, "info");
+            return await MakeRemoteRequestAsync(new HttpRequest
+            {
+                HttpVerb = HttpVerb.Get,
+                Url = url
+            }, cancellationToken);
+        }
+
+        public async Task<HttpResponse> MakeRemoteRequestAsync(HttpRequest info, CancellationToken cancellationToken = default)
+        {
+            Guard.ParamNotNull(info, nameof(info));
             info.Validate();
             var domain = info.GetDomain();
-            var req = GetRequest(info);
+            var handler = new HttpClientHandler();
+            if (info.AllowAutoRedirect == false)
+            {
+                handler.AllowAutoRedirect = false;
+            }
 
-            var length = SetupBody(info, req);
-            if ((info.HttpVerb == HttpVerb.Put || info.HttpVerb == HttpVerb.Post) && req.ContentLength == -1)
-                req.ContentLength = length ?? 0;
+            if (info.ClientCertificate != null)
+            {
+                handler.ClientCertificates.Add(info.ClientCertificate);
+            }
+
+            if (info.ServerCertificateCustomValidationCallback != null)
+            {
+                handler.ServerCertificateCustomValidationCallback = info.ServerCertificateCustomValidationCallback;
+            }
+
+            using var client = new HttpClient(handler);
+            if (info.Timeout.HasValue)
+            {
+                client.Timeout = info.Timeout.Value;
+            }
+
+            using var request = BuildRequest(info);
+
             try
             {
-                return ProcessResponse((HttpWebResponse)req.GetResponse(), domain);
-            }
-            catch (WebException ex)
-            {
-                if (ex.Response == null)
-                    throw;
+                using var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
 
-                var code = (int)((HttpWebResponse)ex.Response).StatusCode;
-                if (!(code >= 300 && code < 400) && !info.ProceedOnError)
+                var ms = new MemoryStream();
+                if (response.Content != null)
                 {
-                    throw;
+                    using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
+                    await stream.CopyToAsync(ms, 81920, cancellationToken);
                 }
-                var result = ProcessResponse((HttpWebResponse)ex.Response, domain);
-                result.ErrorOccurred = !(code >= 300 && code < 400);
+                ms.Position = 0;
+
+                var headers = response.Headers
+                    .SelectMany(h => h.Value.Select(v => new KeyValuePair<string, string>(h.Key, v)))
+                    .Concat(response.Content?.Headers.SelectMany(h => h.Value.Select(v => new KeyValuePair<string, string>(h.Key, v))) ?? Enumerable.Empty<KeyValuePair<string, string>>())
+                    .ToList();
+
+                var result = new HttpResponse(response.StatusCode, headers, ms, domain);
+                var statusCodeIsError = ((int)response.StatusCode) < 200 || ((int)response.StatusCode) >= 400;
+                if (statusCodeIsError && !info.ProceedOnError)
+                    throw new HttpRequestException($"HTTP {response.StatusCode}: {response.ReasonPhrase}");
+
+                result.ErrorOccurred = statusCodeIsError;
                 return result;
             }
-        }
-
-        public Task<HttpResponse> MakeRemoteRequestAsync(HttpRequest info)
-        {
-            return Task.Factory.StartNew(() => MakeRemoteRequest(info));
+            catch (OperationCanceledException)
+            {
+                throw new TimeoutException("Request timeout.");
+            }
         }
 
         public HttpResponse MakeRemoteRequest(string url)
         {
-            return MakeRemoteRequest(url, HttpVerb.Get);
-        }
-
-        public Task<HttpResponse> MakeRemoteRequestAsync(string url)
-        {
-            return Task.Factory.StartNew(() => MakeRemoteRequest(url));
-        }
-
-        public HttpResponse MakeRemoteRequest(string url, HttpVerb verb)
-        {
-            return MakeRemoteRequest(url, verb, null);
-        }
-
-        public Task<HttpResponse> MakeRemoteRequestAsync(string url, HttpVerb verb)
-        {
-            return Task.Factory.StartNew(() => MakeRemoteRequest(url, verb));
-        }
-
-        public HttpResponse MakeRemoteRequest(string url, HttpVerb verb, string body)
-        {
             return MakeRemoteRequest(new HttpRequest
             {
                 Url = url,
-                HttpVerb = verb,
-                PostBody = body
+                HttpVerb = HttpVerb.Get
             });
         }
 
-        public Task<HttpResponse> MakeRemoteRequestAsync(string url, HttpVerb verb, string body)
+        public HttpResponse MakeRemoteRequest(HttpRequest info)
         {
-            return Task.Factory.StartNew(() => MakeRemoteRequest(url, verb, body));
+            return MakeRemoteRequestAsync(info).GetAwaiter().GetResult();
         }
 
-        private static HttpResponse ProcessResponse(HttpWebResponse response, string domain)
+        // Request builder
+        private HttpRequestMessage BuildRequest(HttpRequest info)
         {
-            var res = (Stream)null;
-            using (var rs = response.GetResponseStream())
-                res = rs.CopyToMemory();
-            if (res.Position != 0)
-                res.Position = 0;
-            var headers = new List<KeyValuePair<string, string>>();
-            foreach (var key in response.Headers.AllKeys)
-            {
-                var values = response.Headers.GetValues(key);
-                headers.AddRange(values.Select(x => new KeyValuePair<string, string>(key, x)));
-            }
-            //var headers = response.Headers.AllKeys.Select(x => new KeyValuePair<string, string>(x, response.Headers[x])).ToList();
-            return new HttpResponse(response.StatusCode, headers, res, domain);
-        }
+            var request = new HttpRequestMessage(new HttpMethod(info.HttpVerb.ToString().ToUpper()), info.GetUrl());
 
-        private static long? SetupBody(HttpRequest info, HttpWebRequest reqObject)
-        {
-            if (info.MultipartPostParams.Any())
-                return FillMultipart(info, reqObject);
-            if (info.PostBinaryBody != null && info.PostBinaryBody.Any())
-            {
-                if (reqObject.ContentType == null)
-                    reqObject.ContentType = HttpRequest.ContentTypeFormUrlEncoded;
-                using (var rs = reqObject.GetRequestStream())
-                {
-                    rs.Write(info.PostBinaryBody);
-                    return info.PostBinaryBody.LongLength;
-                }
-            }
-            if (!string.IsNullOrEmpty(info.PostBody))
-            {
-                if (reqObject.ContentType == null)
-                    reqObject.ContentType = HttpRequest.ContentTypeFormUrlEncoded;
-                using (var rs = reqObject.GetRequestStream())
-                {
-                    var bytes = Encoding.UTF8.GetBytes(info.PostBody);
-                    rs.Write(bytes);
-                    return bytes.LongLength;
-                }
-            }
-            if (info.PostParams.Any())
-            {
-                if (reqObject.ContentType == null)
-                    reqObject.ContentType = HttpRequest.ContentTypeFormUrlEncoded;
-                using (var rs = reqObject.GetRequestStream())
-                {
-                    var result = info.PostParams.Aggregate(new StringBuilder(), (sb, x) => sb.AppendFormat("{0}={1}&", HttpUtility.UrlEncode(x.Key), HttpUtility.UrlEncode(x.Value)), x => x.Length > 0 ? x.RemoveLast().ToString() : x.ToString());
-                    var bytes = Encoding.UTF8.GetBytes(result);
-                    rs.Write(bytes);
-                    return bytes.LongLength;
-                }
-            }
-            return null;
-        }
+            var content = CreateHttpContent(info);
+            if (content != null)
+                request.Content = content;
 
-        /// <summary>
-        /// Populates the body of the request and returns the actual content length
-        /// </summary>
-        /// <param name="info"></param>
-        /// <param name="reqObject"></param>
-        /// <returns></returns>
-        private static long FillMultipart(HttpRequest info, HttpWebRequest reqObject)
-        {
-            var ms = new MemoryStream();
-            var @params = info.MultipartPostParams;
-            var boundary = string.Format("----------{0:N}", Guid.NewGuid());
-            reqObject.ContentType = string.Format("multipart/form-data; boundary={0}", boundary);
-            var needsNewLine = false;
-            foreach (var item in @params)
-            {
-                if (needsNewLine)
-                    ms.WriteText("\r\n");
-                needsNewLine = true;
-                var header = (string)null;
-                if (item.FileName != null && item.ContentType != null)
-                    header = string.Format("--{0}\r\nContent-Disposition: form-data; name=\"{1}\"; filename=\"{2}\";\r\nContent-Type: {3}\r\n\r\n", boundary, item.ParamName, item.FileName, item.ContentType);
-                else
-                    header = string.Format("--{0}\r\nContent-Disposition: form-data; name=\"{1}\"\r\n\r\n", boundary, item.ParamName);
-                ms.WriteText(header);
-                ms.Write(item.Value);
-            }
-            ms.WriteText(string.Format("\r\n--{0}--\r\n", boundary));
-            ms.Position = 0;
-            using (var rs = reqObject.GetRequestStream())
-                ms.CopyTo(rs);
-            return ms.Length;
-        }
-        private HttpWebRequest GetRequest(HttpRequest info)
-        {
-            var url = info.GetUrl();
-            var client = new HttpClient();
-            var req = (HttpWebRequest)WebRequest.Create(url);
+            request.Headers.UserAgent.Clear();
+            request.Headers.TryAddWithoutValidation("User-Agent", info.UserAgent ?? _defaultUserAgent);
 
-            var headers = info.GetAllHeaders();
-            var typedHeaders = headers.Keys.OfType<HttpRequestHeader>().ToDictionary(x => x, x => headers[x]);
-            var stringHeaders = headers.Keys.OfType<string>().ToDictionary(x => x, x => headers[x]);
-            req.Method = info.HttpVerb.ToString().ToUpper();
-            req.UserAgent = info.UserAgent ?? UserAgent;
-            if (info.AllowAutoRedirect.HasValue)
-                req.AllowAutoRedirect = info.AllowAutoRedirect.Value;
-            info.Timeout.Try(x =>
-            {
-                if (x.Value > TimeSpan.Zero)
-                    req.Timeout = (int)x.Value.TotalMilliseconds;
-            });
-
-            if (!string.IsNullOrWhiteSpace(info.UserName))
-                req.Headers["Authorization"] = string.Format("Basic {0}", string.Format("{0}:{1}", info.UserName, info.Password).ToByte().ToBase64());
             if (!string.IsNullOrWhiteSpace(info.BearerToken))
-                req.Headers["Authorization"] = string.Format("Bearer {0}", info.BearerToken);
+            {
+                request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", info.BearerToken);
+            }
+            else if (!string.IsNullOrWhiteSpace(info.UserName))
+            {
+                var basic = Convert.ToBase64String(Encoding.UTF8.GetBytes($"{info.UserName}:{info.Password ?? ""}"));
+                request.Headers.Authorization = new AuthenticationHeaderValue("Basic", basic);
+            }
 
             if (info.EmulateAjax)
-                req.Headers["X-Requested-With"] = "XMLHttpRequest";
+                request.Headers.TryAddWithoutValidation("X-Requested-With", "XMLHttpRequest");
 
-            if (info.Cookies != null && info.Cookies.Any())
+            if (info.Cookies?.Any() == true)
             {
-                req.CookieContainer = new CookieContainer();
-                info.Cookies.ForEach(x => req.CookieContainer.Add(x));
+                var cookieStr = string.Join("; ", info.Cookies.Select(c => $"{c.Name}={c.Value}"));
+                request.Headers.TryAddWithoutValidation("Cookie", cookieStr);
             }
 
-            setUpHeader(HttpRequestHeader.ContentType, x => req.ContentType = x);
-            setUpHeader(HttpRequestHeader.Accept, x => req.Accept = x);
-            setUpHeader(HttpRequestHeader.Referer, x => req.Referer = x);
-            setUpHeader(HttpRequestHeader.Connection, x => req.Connection = x);
-
-            foreach (var header in typedHeaders)
-                req.Headers.Add(header.Key, header.Value);
-            foreach (var header in stringHeaders)
-                req.Headers.Add(header.Key, header.Value);
-
-            return req;
-
-            void setUpHeader(HttpRequestHeader x, Action<string> y)
+            foreach (var kv in info.GetAllHeaders())
             {
-                if (typedHeaders.ContainsKey(x))
+                var key = kv.Key is HttpRequestHeader h ? h.ToString() : kv.Key.ToString();
+                request.Headers.TryAddWithoutValidation(key, kv.Value);
+            }
+
+            return request;
+        }
+
+        private static HttpContent CreateHttpContent(HttpRequest info)
+        {
+            if (info.MultipartPostParams?.Any() == true)
+            {
+                var multi = new MultipartFormDataContent();
+                foreach (var p in info.MultipartPostParams)
                 {
-                    y(typedHeaders[x]);
-                    typedHeaders.Remove(x);
+                    if (p.FileName != null)
+                    {
+                        var bc = new ByteArrayContent(p.Value ?? Array.Empty<byte>());
+                        if (p.ContentType != null)
+                            bc.Headers.ContentType = MediaTypeHeaderValue.Parse(p.ContentType);
+                        multi.Add(bc, p.ParamName, p.FileName);
+                    }
+                    else
+                    {
+                        var val = p.Value != null ? Encoding.UTF8.GetString(p.Value) : "";
+                        multi.Add(new StringContent(val, Encoding.UTF8), p.ParamName);
+                    }
                 }
+                return multi;
             }
+
+            if (info.PostBinaryBody?.Any() == true)
+                return new ByteArrayContent(info.PostBinaryBody);
+
+            if (!string.IsNullOrWhiteSpace(info.PostBody))
+                return new StringContent(info.PostBody, Encoding.UTF8, info.ContentType ?? "application/x-www-form-urlencoded");
+
+            if (info.PostParams?.Any() == true)
+                return new FormUrlEncodedContent(info.PostParams);
+
+            return null;
         }
     }
 }

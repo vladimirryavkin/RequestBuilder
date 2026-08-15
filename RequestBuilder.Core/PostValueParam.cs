@@ -1,23 +1,29 @@
 ﻿using System;
 using System.Text;
 
-namespace RequestBuilder {
-    public class PostValueParam : IMultipartParameter {
-        public String ParamName { get; private set; }
-        public String Value { get; private set; }
-        public PostValueParam(String paramName, String value) {
+namespace RequestBuilder
+{
+    public class PostValueParam : IMultipartParameter
+    {
+        public string ParamName { get; private set; }
+        public string Value { get; private set; }
+        public PostValueParam(string paramName, string value)
+        {
             Guard.PropertyNotNullOrEmpty(paramName, "paramName");
-            Guard.PropertyNotNullOrEmpty(value, "value");
+            Guard.PropertyNotNull(value, "value");
             ParamName = paramName;
             Value = value;
         }
-        byte[] IMultipartParameter.Value {
+        byte[] IMultipartParameter.Value
+        {
             get { return Value.Return(x => Encoding.UTF8.GetBytes(Value), null); }
         }
-        String IMultipartParameter.FileName {
+        string IMultipartParameter.FileName
+        {
             get { return null; }
         }
-        String IMultipartParameter.ContentType {
+        string IMultipartParameter.ContentType
+        {
             get { return null; }
         }
     }

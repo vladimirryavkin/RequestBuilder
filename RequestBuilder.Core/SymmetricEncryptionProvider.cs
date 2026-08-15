@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace RequestBuilder {
     public enum SymmetricEncryptionProvider {
-        TrippleDes,
+        [Obsolete("Gradually being deprecated. Use Aes256")] TrippleDes,
         Aes256
     }
 }
