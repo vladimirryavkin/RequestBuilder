@@ -293,8 +293,10 @@ namespace RequestBuilder.ViewModels
             return true;
         }
 
-        // Matches exactly what WebUtility.UrlEncode (used by SyncFormParamsToBody) produces, so anything
-        // the form grid itself writes always round-trips back into a parseable body.
+        // Covers what WebUtility.UrlEncode (used by SyncFormParamsToBody) produces, plus the wider set of
+        // "mark" characters (!*'()) that other common encoders - notably JavaScript's encodeURIComponent -
+        // leave unescaped. All of these are valid, unambiguous bytes in a form-urlencoded value; only
+        // characters that would actually be ambiguous (space, {}"<> etc.) require rejecting the body.
         private static bool IsValidUrlEncodedToken(string s)
         {
             for (int i = 0; i < s.Length; i++)
@@ -306,7 +308,7 @@ namespace RequestBuilder.ViewModels
                         return false;
                     i += 2;
                 }
-                else if (!char.IsLetterOrDigit(c) && c != '-' && c != '_' && c != '.' && c != '~' && c != '+')
+                else if (!char.IsLetterOrDigit(c) && "-_.~+!*'()".IndexOf(c) == -1)
                 {
                     return false;
                 }

@@ -35,6 +35,14 @@
             <Setter Property="VerticalAlignment" Value="Center"/>
         </Style>
 
+        <Style x:Key="PropertyNameEditorStyle" TargetType="TextBox" BasedOn="{StaticResource InlineEditorStyle}">
+            <Setter Property="Foreground" Value="#4775BE"/>
+        </Style>
+
+        <Style x:Key="StringValueEditorStyle" TargetType="TextBox" BasedOn="{StaticResource InlineEditorStyle}">
+            <Setter Property="Foreground" Value="#A4152A"/>
+        </Style>
+
         <!-- Implicit (keyless) template: matched automatically by DataType wherever a JsonNodeViewModel
              needs rendering, including recursively from the ItemsControl below. A keyed template with a
              StaticResource self-reference does NOT reliably resolve here (deferred-content load ordering),
@@ -45,7 +53,7 @@
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                         <TextBlock Text="&quot;" Visibility="{Binding HasName, Converter={StaticResource BoolToVis}}"/>
                         <TextBox Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}"
-                                 Style="{StaticResource InlineEditorStyle}"
+                                 Style="{StaticResource PropertyNameEditorStyle}"
                                  Visibility="{Binding HasName, Converter={StaticResource BoolToVis}}"
                                  Loaded="Editor_Loaded"/>
                         <TextBlock Text="&quot;: " Visibility="{Binding HasName, Converter={StaticResource BoolToVis}}"/>
@@ -54,7 +62,7 @@
                         <TextBlock Text="[" FontWeight="Bold" Visibility="{Binding IsArray, Converter={StaticResource BoolToVis}}"/>
 
                         <TextBox Text="{Binding StringValue, UpdateSourceTrigger=PropertyChanged}"
-                                 Style="{StaticResource InlineEditorStyle}"
+                                 Style="{StaticResource StringValueEditorStyle}"
                                  Visibility="{Binding IsString, Converter={StaticResource BoolToVis}}"
                                  Loaded="Editor_Loaded"/>
                         <TextBox Text="{Binding StringValue, UpdateSourceTrigger=PropertyChanged}"
@@ -62,10 +70,11 @@
                                  Visibility="{Binding IsNumber, Converter={StaticResource BoolToVis}}"
                                  Loaded="Editor_Loaded"/>
                         <CheckBox IsChecked="{Binding BoolValue}"
+                                  Foreground="#0A00FE"
                                   VerticalAlignment="Center"
                                   Visibility="{Binding IsBoolean, Converter={StaticResource BoolToVis}}"
                                   Loaded="Editor_Loaded"/>
-                        <TextBlock Text="null" FontStyle="Italic" Opacity="0.6"
+                        <TextBlock Text="null" Foreground="#0A00FE" FontStyle="Italic" Opacity="0.6"
                                    Visibility="{Binding IsNull, Converter={StaticResource BoolToVis}}"/>
 
                         <TextBlock Text="," Visibility="{Binding ShowLeafComma, Converter={StaticResource BoolToVis}}"/>
