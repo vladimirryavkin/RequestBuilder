@@ -4,27 +4,6 @@ using Newtonsoft.Json.Linq;
 
 namespace RequestBuilder.ViewModels
 {
-    public enum JsonNodeKind { Object, Array, String, Number, Boolean, Null }
-
-    /// <summary>Shared state for one JsonTreeView instance: current selection and an edit notification.</summary>
-    public class JsonTreeContext
-    {
-        public event Action Changed;
-
-        public JsonNodeViewModel SelectedNode { get; private set; }
-
-        public void Select(JsonNodeViewModel node)
-        {
-            if (ReferenceEquals(SelectedNode, node)) return;
-            var previous = SelectedNode;
-            SelectedNode = node;
-            previous?.RaiseIsSelectedChanged();
-            node?.RaiseIsSelectedChanged();
-        }
-
-        public void NotifyChanged() => Changed?.Invoke();
-    }
-
     /// <summary>
     /// One node of an editable JSON tree (object, array, or scalar). Mirrors a JToken but owns its own
     /// editable state so the UI never has to fight Newtonsoft.Json.Linq's own change semantics (e.g.
@@ -37,8 +16,6 @@ namespace RequestBuilder.ViewModels
         private string stringValue;
         private bool boolValue;
         private bool isLast = true;
-        private bool focusRequested;
-        private bool scrollRequested;
 
         public JsonTreeContext Context { get; }
         public JsonNodeViewModel Parent { get; }
@@ -128,9 +105,6 @@ namespace RequestBuilder.ViewModels
             }
         }
 
-        public bool IsSelected => Context.SelectedNode == this;
-        internal void RaiseIsSelectedChanged() => OnPropertyChanged(nameof(IsSelected));
-
         public bool IsLast
         {
             get => isLast;
@@ -147,19 +121,12 @@ namespace RequestBuilder.ViewModels
         public bool ShowLeafComma => !IsContainer && !IsLast;
         public bool ShowClosingComma => IsContainer && !IsLast;
 
-        /// <summary>Set on a freshly added/edited node so the view can grab keyboard focus once its editor loads.</summary>
-        public bool FocusRequested
-        {
-            get => focusRequested;
-            set { focusRequested = value; OnPropertyChanged(); }
-        }
-
-        /// <summary>Set on a freshly appended array element so the view can scroll it into view once it loads.</summary>
-        public bool ScrollRequested
-        {
-            get => scrollRequested;
-            set { scrollRequested = value; OnPropertyChanged(); }
-        }
+        /// <summary>
+        /// Set by editing operations that create or retype a node, naming which of its stops the view
+        /// should grab keyboard focus for once that stop's element loads or becomes visible. Not used for
+        /// navigating between already-visible stops (Tab/Shift+Tab/Up/Down) - those focus directly.
+        /// </summary>
+        public JsonStopKind? PendingFocusStop { get; set; }
 
         private void RefreshChildPositions()
         {
@@ -252,7 +219,34 @@ namespace RequestBuilder.ViewModels
             return 0L;
         }
 
-        // ---- Editing operations (invoked from context menu items) ----
+        // ---- Keyboard traversal ----
+
+        /// <summary>
+        /// Every focusable stop in this node's subtree, in the exact order the tree renders them: a
+        /// container's own opening brace/bracket comes before its children, which come before its closing
+        /// brace/bracket ("forward and inward" - this is the Tab order). Recomputed on demand since the
+        /// tree shape changes constantly under editing; cheap enough at realistic JSON sizes.
+        /// </summary>
+        public static List<(JsonNodeViewModel Node, JsonStopKind Stop)> GetAllStops(JsonNodeViewModel root)
+        {
+            var list = new List<(JsonNodeViewModel Node, JsonStopKind Stop)>();
+            Collect(root, list);
+            return list;
+        }
+
+        private static void Collect(JsonNodeViewModel node, List<(JsonNodeViewModel Node, JsonStopKind Stop)> list)
+        {
+            if (node.HasName) list.Add((node, JsonStopKind.Name));
+            list.Add((node, JsonStopKind.Value));
+            if (node.IsContainer)
+            {
+                foreach (var child in node.Children)
+                    Collect(child, list);
+                list.Add((node, JsonStopKind.Close));
+            }
+        }
+
+        // ---- Editing operations (invoked from context menu items and keyboard shortcuts) ----
 
         public JsonNodeViewModel AddChild(JsonNodeKind kind)
         {
@@ -260,20 +254,66 @@ namespace RequestBuilder.ViewModels
             var childName = IsObject ? GenerateUniquePropertyName() : null;
             var child = new JsonNodeViewModel(Context, kind, childName, this);
             Children.Add(child);
-            child.FocusRequested = true;
+            child.PendingFocusStop = child.HasName ? JsonStopKind.Name : JsonStopKind.Value;
             NotifyChanged();
             return child;
         }
 
         /// <summary>
-        /// Array-only: adds a new object element scaffolded with the properties common to every other
-        /// object element already in this array (names + types, default/empty values) - a ready-made
-        /// shape matching the array's existing objects rather than a blank {}.
+        /// Object-property Enter flow: commits the current property and adds a new blank string property
+        /// right after it in the same parent object, focused on its name so the key can be typed next.
         /// </summary>
+        public JsonNodeViewModel AddSiblingStringProperty()
+        {
+            if (Parent == null || Parent.Kind != JsonNodeKind.Object) return null;
+            var idx = Parent.Children.IndexOf(this);
+            var sibling = new JsonNodeViewModel(Context, JsonNodeKind.String, Parent.GenerateUniquePropertyName(), Parent);
+            Parent.Children.Insert(idx + 1, sibling);
+            sibling.PendingFocusStop = JsonStopKind.Name;
+            Parent.NotifyChanged();
+            return sibling;
+        }
+
+        /// <summary>Array-only: adds a new object element (append) scaffolded from the array's common property shape.</summary>
         public JsonNodeViewModel AddCommonObjectChild()
         {
             if (!IsArray) return null;
+            var common = BuildCommonObject();
+            Children.Add(common);
+            NotifyChanged();
+            return common;
+        }
 
+        /// <summary>Array-only ('[' Enter): inserts a new common-shaped object as the array's first element.</summary>
+        public JsonNodeViewModel InsertCommonObjectAtStart()
+        {
+            if (!IsArray) return null;
+            var common = BuildCommonObject();
+            Children.Insert(0, common);
+            common.PendingFocusStop = JsonStopKind.Value;
+            NotifyChanged();
+            return common;
+        }
+
+        /// <summary>Object-array-element-only ('}' Enter): inserts a new common-shaped object right after this one.</summary>
+        public JsonNodeViewModel InsertCommonObjectNext()
+        {
+            if (!IsArrayElement || Kind != JsonNodeKind.Object) return null;
+            var idx = Parent.Children.IndexOf(this);
+            var common = Parent.BuildCommonObject();
+            Parent.Children.Insert(idx + 1, common);
+            common.PendingFocusStop = JsonStopKind.Value;
+            Parent.NotifyChanged();
+            return common;
+        }
+
+        /// <summary>
+        /// Array-only: builds (without inserting) an object scaffolded with the properties common to every
+        /// other object element already in this array (names + types, default/empty values) - a ready-made
+        /// shape matching the array's existing objects rather than a blank {}.
+        /// </summary>
+        private JsonNodeViewModel BuildCommonObject()
+        {
             var objectSiblings = Children.Where(c => c.IsObject).ToList();
             var common = new JsonNodeViewModel(Context, JsonNodeKind.Object, null, this);
 
@@ -291,8 +331,6 @@ namespace RequestBuilder.ViewModels
                 }
             }
 
-            Children.Add(common);
-            NotifyChanged();
             return common;
         }
 
@@ -314,7 +352,6 @@ namespace RequestBuilder.ViewModels
                 NotifyChanged();
                 return;
             }
-            if (Context.SelectedNode == this) Context.Select(null);
             Parent.Children.Remove(this);
             NotifyChanged();
         }
@@ -373,7 +410,24 @@ namespace RequestBuilder.ViewModels
             }
             OnPropertyChanged(nameof(StringValue));
             OnPropertyChanged(nameof(BoolValue));
+            PendingFocusStop = JsonStopKind.Value;
             NotifyChanged();
+        }
+
+        /// <summary>Shift+Enter flow: string -> number -> null -> boolean -> object -> array -> (back to) string.</summary>
+        public void CycleType()
+        {
+            if (IsRoot) return;
+            ChangeType(Kind switch
+            {
+                JsonNodeKind.String => JsonNodeKind.Number,
+                JsonNodeKind.Number => JsonNodeKind.Null,
+                JsonNodeKind.Null => JsonNodeKind.Boolean,
+                JsonNodeKind.Boolean => JsonNodeKind.Object,
+                JsonNodeKind.Object => JsonNodeKind.Array,
+                JsonNodeKind.Array => JsonNodeKind.String,
+                _ => JsonNodeKind.String,
+            });
         }
 
         public void CopyNext()
@@ -382,7 +436,7 @@ namespace RequestBuilder.ViewModels
             var idx = Parent.Children.IndexOf(this);
             var clone = DeepClone(Parent);
             Parent.Children.Insert(idx + 1, clone);
-            Context.Select(clone);
+            clone.PendingFocusStop = JsonStopKind.Value;
             NotifyChanged();
         }
 
@@ -391,8 +445,7 @@ namespace RequestBuilder.ViewModels
             if (!IsArrayElement) return;
             var clone = DeepClone(Parent);
             Parent.Children.Add(clone);
-            Context.Select(clone);
-            clone.ScrollRequested = true;
+            clone.PendingFocusStop = JsonStopKind.Value;
             NotifyChanged();
         }
 

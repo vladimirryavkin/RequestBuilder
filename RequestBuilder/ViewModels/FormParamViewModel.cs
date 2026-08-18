@@ -5,7 +5,7 @@ namespace RequestBuilder.ViewModels
         private string key = "";
         private string val = "";
 
-        public event Action? Changed;
+        public event Action Changed;
 
         public string Key
         {

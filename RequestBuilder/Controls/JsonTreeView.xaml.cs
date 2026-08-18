@@ -11,10 +11,19 @@ namespace RequestBuilder.Controls
     /// Editable tree view for a JSON object. Bind a JObject via DataContext; the control builds its own
     /// editable JsonNodeViewModel tree from it and raises Changed whenever the user edits anything.
     /// Call GetJson() to read the current value back out.
+    ///
+    /// Keyboard model: every node contributes up to three focusable "stops" (Name, Value, Close - see
+    /// JsonStopKind). Tab/Shift+Tab walk the full flattened stop list depth-first ("forward and inward").
+    /// Up/Down move to the same stop of the previous/next sibling. Enter and Shift+Enter behave contextually
+    /// per stop (see HandleEnter/HandleShiftEnter). A small registry maps (node, stop) to its live element
+    /// so navigation between already-rendered stops can focus immediately; brand-new or newly-shown stops
+    /// (from an edit) are instead requested via JsonNodeViewModel.PendingFocusStop and claimed once loaded.
     /// </summary>
     public partial class JsonTreeView : UserControl
     {
         private JsonTreeContext context;
+        private JsonNodeViewModel rootNode;
+        private readonly Dictionary<(JsonNodeViewModel Node, JsonStopKind Stop), FrameworkElement> stopElements = new();
 
         public event Action Changed;
 
@@ -24,51 +33,187 @@ namespace RequestBuilder.Controls
             DataContextChanged += OnDataContextChanged;
         }
 
-        public JObject GetJson() => (RootPresenter.Content as JsonNodeViewModel)?.ToToken() as JObject;
+        public JObject GetJson() => rootNode?.ToToken() as JObject;
 
         private void OnDataContextChanged(object sender, DependencyPropertyChangedEventArgs e)
         {
+            stopElements.Clear();
             if (e.NewValue is JObject jObject)
             {
                 context = new JsonTreeContext();
                 context.Changed += () => Changed?.Invoke();
-                RootPresenter.Content = JsonNodeViewModel.BuildRoot(jObject, context);
+                rootNode = JsonNodeViewModel.BuildRoot(jObject, context);
+                RootPresenter.Content = rootNode;
             }
             else
             {
                 context = null;
+                rootNode = null;
                 RootPresenter.Content = null;
             }
         }
 
-        private void Row_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        // ---- Stop registry & focus bookkeeping ----
+
+        // A node's Value stop has several mutually-exclusive possible elements (open brace, bracket,
+        // string/number box, checkbox, null box) that all live in the visual tree at once with only one
+        // ever Visible at a time. Loaded fires for all of them regardless of visibility, so registration
+        // (and re-registration on a Kind change) must only happen for the one that's actually shown -
+        // otherwise whichever happened to load last would silently win the registry slot.
+
+        private void Stop_Loaded(object sender, RoutedEventArgs e)
         {
-            if (sender is FrameworkElement fe && fe.DataContext is JsonNodeViewModel node)
-            {
-                node.Context.Select(node);
-                e.Handled = true;
-            }
+            var fe = sender as FrameworkElement;
+            if (fe == null) return;
+            // IsVisibleChanged is a plain CLR event (not a RoutedEvent), so it can't be wired via an
+            // EventSetter in a Style like Loaded/Unloaded/PreviewKeyDown - subscribe by hand instead.
+            // The -= guards against double subscription if Loaded ever fires more than once.
+            fe.IsVisibleChanged -= Stop_IsVisibleChanged;
+            fe.IsVisibleChanged += Stop_IsVisibleChanged;
+            if (fe.IsVisible) Register(fe);
+            TryConsumePendingFocus(fe);
         }
 
-        private void Row_Loaded(object sender, RoutedEventArgs e)
+        private void Stop_Unloaded(object sender, RoutedEventArgs e)
         {
-            if (sender is not FrameworkElement fe || fe.DataContext is not JsonNodeViewModel node) return;
-            if (!node.ScrollRequested) return;
-            node.ScrollRequested = false;
-            fe.Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(() => fe.BringIntoView()));
+            var fe = sender as FrameworkElement;
+            if (fe == null) return;
+            fe.IsVisibleChanged -= Stop_IsVisibleChanged;
+            Unregister(fe);
         }
 
-        private void Editor_Loaded(object sender, RoutedEventArgs e)
+        private void Stop_IsVisibleChanged(object sender, DependencyPropertyChangedEventArgs e)
         {
-            if (sender is not FrameworkElement fe || fe.DataContext is not JsonNodeViewModel node) return;
-            if (!node.FocusRequested) return;
-            node.FocusRequested = false;
+            if (e.NewValue is not true) return;
+            var fe = sender as FrameworkElement;
+            Register(fe);
+            TryConsumePendingFocus(fe);
+        }
+
+        private void Register(FrameworkElement fe)
+        {
+            if (fe?.DataContext is not JsonNodeViewModel node || fe.Tag is not JsonStopKind stop) return;
+            stopElements[(node, stop)] = fe;
+        }
+
+        private void Unregister(FrameworkElement fe)
+        {
+            if (fe?.DataContext is not JsonNodeViewModel node || fe.Tag is not JsonStopKind stop) return;
+            if (stopElements.TryGetValue((node, stop), out var registered) && ReferenceEquals(registered, fe))
+                stopElements.Remove((node, stop));
+        }
+
+        private void TryConsumePendingFocus(FrameworkElement fe)
+        {
+            if (fe == null || fe.DataContext is not JsonNodeViewModel node || fe.Tag is not JsonStopKind stop) return;
+            if (node.PendingFocusStop != stop || !fe.IsVisible) return;
+            node.PendingFocusStop = null;
+            FocusElement(fe);
+        }
+
+        private bool TryFocusExisting(JsonNodeViewModel node, JsonStopKind stop)
+        {
+            if (node == null || !stopElements.TryGetValue((node, stop), out var fe) || !fe.IsVisible) return false;
+            FocusElement(fe);
+            return true;
+        }
+
+        private static void FocusElement(FrameworkElement fe)
+        {
             fe.Dispatcher.BeginInvoke(DispatcherPriority.Input, new Action(() =>
             {
                 fe.Focus();
-                if (fe is TextBox tb) tb.SelectAll();
+                fe.BringIntoView();
+                if (fe is TextBox { IsReadOnly: false } tb) tb.SelectAll();
             }));
         }
+
+        // ---- Keyboard navigation & editing shortcuts ----
+
+        private void Stop_PreviewKeyDown(object sender, KeyEventArgs e)
+        {
+            if (sender is not FrameworkElement fe || fe.DataContext is not JsonNodeViewModel node || fe.Tag is not JsonStopKind stop)
+                return;
+
+            var shift = (Keyboard.Modifiers & ModifierKeys.Shift) != 0;
+            switch (e.Key)
+            {
+                case Key.Enter when shift:
+                    HandleShiftEnter(node, stop);
+                    e.Handled = true;
+                    break;
+                case Key.Enter:
+                    HandleEnter(node, stop);
+                    e.Handled = true;
+                    break;
+                case Key.Tab:
+                    MoveTab(node, stop, shift ? -1 : 1);
+                    e.Handled = true;
+                    break;
+                case Key.Up:
+                    MoveSibling(node, stop, -1);
+                    e.Handled = true;
+                    break;
+                case Key.Down:
+                    MoveSibling(node, stop, 1);
+                    e.Handled = true;
+                    break;
+            }
+        }
+
+        private static void HandleEnter(JsonNodeViewModel node, JsonStopKind stop)
+        {
+            switch (stop)
+            {
+                case JsonStopKind.Name when node.HasName:
+                    node.AddSiblingStringProperty();
+                    break;
+                case JsonStopKind.Value when node.IsObject:
+                    node.AddChild(JsonNodeKind.String);
+                    break;
+                case JsonStopKind.Value when node.IsArray:
+                    node.InsertCommonObjectAtStart();
+                    break;
+                case JsonStopKind.Value when node.HasName:
+                    node.AddSiblingStringProperty();
+                    break;
+                case JsonStopKind.Close when node.IsObject && node.IsArrayElement:
+                    node.InsertCommonObjectNext();
+                    break;
+            }
+        }
+
+        private static void HandleShiftEnter(JsonNodeViewModel node, JsonStopKind stop)
+        {
+            if (stop == JsonStopKind.Name || stop == JsonStopKind.Value)
+                node.CycleType();
+        }
+
+        private void MoveTab(JsonNodeViewModel node, JsonStopKind stop, int direction)
+        {
+            if (rootNode == null) return;
+            var stops = JsonNodeViewModel.GetAllStops(rootNode);
+            var idx = stops.FindIndex(s => s.Node == node && s.Stop == stop);
+            if (idx == -1) return;
+            var nextIdx = idx + direction;
+            if (nextIdx < 0 || nextIdx >= stops.Count) return;
+            var (nextNode, nextStop) = stops[nextIdx];
+            TryFocusExisting(nextNode, nextStop);
+        }
+
+        private void MoveSibling(JsonNodeViewModel node, JsonStopKind stop, int direction)
+        {
+            var parent = node.Parent;
+            if (parent == null) return;
+            var idx = parent.Children.IndexOf(node);
+            var targetIdx = idx + direction;
+            if (targetIdx < 0 || targetIdx >= parent.Children.Count) return;
+            var target = parent.Children[targetIdx];
+            var targetStop = stop == JsonStopKind.Close && !target.IsContainer ? JsonStopKind.Value : stop;
+            TryFocusExisting(target, targetStop);
+        }
+
+        // ---- Context menu ----
 
         private void Row_ContextMenuOpening(object sender, ContextMenuEventArgs e)
         {

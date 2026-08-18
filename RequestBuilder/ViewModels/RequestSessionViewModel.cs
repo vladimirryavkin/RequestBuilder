@@ -553,7 +553,7 @@ namespace RequestBuilder.ViewModels
             catch { }
         });
 
-        public event Action<RequestHistoryItem>? RequestCompleted;
+        public event Action<RequestHistoryItem> RequestCompleted;
 
         public Command RunCommand => new Command(async () =>
         {

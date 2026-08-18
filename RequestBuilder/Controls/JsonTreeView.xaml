@@ -9,7 +9,9 @@
     <UserControl.Resources>
         <BooleanToVisibilityConverter x:Key="BoolToVis"/>
 
-        <Style x:Key="NodeRowStyle" TargetType="Border">
+        <!-- Row hit-test wrapper: owns the right-click context menu for a node. Selection/keyboard focus
+             now lives on the individual stop editors below, not on this Border. -->
+        <Style x:Key="RowHitTestStyle" TargetType="Border">
             <Setter Property="Background" Value="Transparent"/>
             <Setter Property="Padding" Value="2 1"/>
             <Setter Property="ContextMenu">
@@ -17,22 +19,28 @@
                     <ContextMenu/>
                 </Setter.Value>
             </Setter>
-            <EventSetter Event="MouseLeftButtonDown" Handler="Row_MouseLeftButtonDown"/>
             <EventSetter Event="ContextMenuOpening" Handler="Row_ContextMenuOpening"/>
-            <EventSetter Event="Loaded" Handler="Row_Loaded"/>
-            <Style.Triggers>
-                <DataTrigger Binding="{Binding IsSelected}" Value="True">
-                    <Setter Property="Background" Value="#332B88D8"/>
-                </DataTrigger>
-            </Style.Triggers>
         </Style>
 
+        <!-- Base style for every focusable "stop" TextBox (name, leaf value, braces, null, closing brace).
+             Carries the shared focus-tracking/keyboard-shortcut wiring so the DataTemplate below only has
+             to set Tag (which stop) and Style (which look) per element. -->
         <Style x:Key="InlineEditorStyle" TargetType="TextBox">
             <Setter Property="BorderThickness" Value="0"/>
             <Setter Property="Background" Value="Transparent"/>
             <Setter Property="Padding" Value="0"/>
             <Setter Property="MinWidth" Value="16"/>
             <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="IsTabStop" Value="False"/>
+            <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+            <EventSetter Event="Loaded" Handler="Stop_Loaded"/>
+            <EventSetter Event="Unloaded" Handler="Stop_Unloaded"/>
+            <EventSetter Event="PreviewKeyDown" Handler="Stop_PreviewKeyDown"/>
+            <Style.Triggers>
+                <Trigger Property="IsFocused" Value="True">
+                    <Setter Property="Background" Value="#332B88D8"/>
+                </Trigger>
+            </Style.Triggers>
         </Style>
 
         <Style x:Key="PropertyNameEditorStyle" TargetType="TextBox" BasedOn="{StaticResource InlineEditorStyle}">
@@ -43,39 +51,68 @@
             <Setter Property="Foreground" Value="#A4152A"/>
         </Style>
 
+        <!-- Braces/brackets/null: not user-editable text, but still a real focusable stop (keyboard nav,
+             Enter/Shift+Enter shortcuts, context menu target), so it's a read-only TextBox rather than a
+             plain TextBlock. -->
+        <Style x:Key="ReadOnlyStopStyle" TargetType="TextBox" BasedOn="{StaticResource InlineEditorStyle}">
+            <Setter Property="IsReadOnly" Value="True"/>
+            <Setter Property="IsReadOnlyCaretVisible" Value="False"/>
+            <Setter Property="Cursor" Value="Arrow"/>
+        </Style>
+
+        <Style x:Key="BoolValueStyle" TargetType="CheckBox" BasedOn="{StaticResource {x:Type CheckBox}}">
+            <Setter Property="Foreground" Value="#0A00FE"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="IsTabStop" Value="False"/>
+            <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+            <EventSetter Event="Loaded" Handler="Stop_Loaded"/>
+            <EventSetter Event="Unloaded" Handler="Stop_Unloaded"/>
+            <EventSetter Event="PreviewKeyDown" Handler="Stop_PreviewKeyDown"/>
+            <Style.Triggers>
+                <Trigger Property="IsFocused" Value="True">
+                    <Setter Property="Background" Value="#332B88D8"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
         <!-- Implicit (keyless) template: matched automatically by DataType wherever a JsonNodeViewModel
              needs rendering, including recursively from the ItemsControl below. A keyed template with a
              StaticResource self-reference does NOT reliably resolve here (deferred-content load ordering),
              so this must stay keyless. -->
         <DataTemplate DataType="{x:Type vm:JsonNodeViewModel}">
             <StackPanel>
-                <Border Style="{StaticResource NodeRowStyle}">
+                <Border Style="{StaticResource RowHitTestStyle}">
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                         <TextBlock Text="&quot;" Visibility="{Binding HasName, Converter={StaticResource BoolToVis}}"/>
                         <TextBox Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}"
+                                 Tag="{x:Static vm:JsonStopKind.Name}"
                                  Style="{StaticResource PropertyNameEditorStyle}"
-                                 Visibility="{Binding HasName, Converter={StaticResource BoolToVis}}"
-                                 Loaded="Editor_Loaded"/>
+                                 Visibility="{Binding HasName, Converter={StaticResource BoolToVis}}"/>
                         <TextBlock Text="&quot;: " Visibility="{Binding HasName, Converter={StaticResource BoolToVis}}"/>
 
-                        <TextBlock Text="{}{" FontWeight="Bold" Visibility="{Binding IsObject, Converter={StaticResource BoolToVis}}"/>
-                        <TextBlock Text="[" FontWeight="Bold" Visibility="{Binding IsArray, Converter={StaticResource BoolToVis}}"/>
+                        <TextBox Text="{}{" Tag="{x:Static vm:JsonStopKind.Value}"
+                                 Style="{StaticResource ReadOnlyStopStyle}" FontWeight="Bold"
+                                 Visibility="{Binding IsObject, Converter={StaticResource BoolToVis}}"/>
+                        <TextBox Text="[" Tag="{x:Static vm:JsonStopKind.Value}"
+                                 Style="{StaticResource ReadOnlyStopStyle}" FontWeight="Bold"
+                                 Visibility="{Binding IsArray, Converter={StaticResource BoolToVis}}"/>
 
                         <TextBox Text="{Binding StringValue, UpdateSourceTrigger=PropertyChanged}"
+                                 Tag="{x:Static vm:JsonStopKind.Value}"
                                  Style="{StaticResource StringValueEditorStyle}"
-                                 Visibility="{Binding IsString, Converter={StaticResource BoolToVis}}"
-                                 Loaded="Editor_Loaded"/>
+                                 Visibility="{Binding IsString, Converter={StaticResource BoolToVis}}"/>
                         <TextBox Text="{Binding StringValue, UpdateSourceTrigger=PropertyChanged}"
+                                 Tag="{x:Static vm:JsonStopKind.Value}"
                                  Style="{StaticResource InlineEditorStyle}"
-                                 Visibility="{Binding IsNumber, Converter={StaticResource BoolToVis}}"
-                                 Loaded="Editor_Loaded"/>
+                                 Visibility="{Binding IsNumber, Converter={StaticResource BoolToVis}}"/>
                         <CheckBox IsChecked="{Binding BoolValue}"
-                                  Foreground="#0A00FE"
-                                  VerticalAlignment="Center"
-                                  Visibility="{Binding IsBoolean, Converter={StaticResource BoolToVis}}"
-                                  Loaded="Editor_Loaded"/>
-                        <TextBlock Text="null" Foreground="#0A00FE" FontStyle="Italic" Opacity="0.6"
-                                   Visibility="{Binding IsNull, Converter={StaticResource BoolToVis}}"/>
+                                  Tag="{x:Static vm:JsonStopKind.Value}"
+                                  Style="{StaticResource BoolValueStyle}"
+                                  Visibility="{Binding IsBoolean, Converter={StaticResource BoolToVis}}"/>
+                        <TextBox Text="null" Tag="{x:Static vm:JsonStopKind.Value}"
+                                 Style="{StaticResource ReadOnlyStopStyle}"
+                                 FontStyle="Italic" Foreground="#0A00FE"
+                                 Visibility="{Binding IsNull, Converter={StaticResource BoolToVis}}"/>
 
                         <TextBlock Text="," Visibility="{Binding ShowLeafComma, Converter={StaticResource BoolToVis}}"/>
                     </StackPanel>
@@ -85,11 +122,17 @@
                               Margin="20 0 0 0"
                               Visibility="{Binding IsContainer, Converter={StaticResource BoolToVis}}"/>
 
-                <StackPanel Orientation="Horizontal" Visibility="{Binding IsContainer, Converter={StaticResource BoolToVis}}">
-                    <TextBlock Text="}" FontWeight="Bold" Visibility="{Binding IsObject, Converter={StaticResource BoolToVis}}"/>
-                    <TextBlock Text="]" FontWeight="Bold" Visibility="{Binding IsArray, Converter={StaticResource BoolToVis}}"/>
-                    <TextBlock Text="," Visibility="{Binding ShowClosingComma, Converter={StaticResource BoolToVis}}"/>
-                </StackPanel>
+                <Border Style="{StaticResource RowHitTestStyle}" Visibility="{Binding IsContainer, Converter={StaticResource BoolToVis}}">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBox Text="}" Tag="{x:Static vm:JsonStopKind.Close}"
+                                 Style="{StaticResource ReadOnlyStopStyle}" FontWeight="Bold"
+                                 Visibility="{Binding IsObject, Converter={StaticResource BoolToVis}}"/>
+                        <TextBox Text="]" Tag="{x:Static vm:JsonStopKind.Close}"
+                                 Style="{StaticResource ReadOnlyStopStyle}" FontWeight="Bold"
+                                 Visibility="{Binding IsArray, Converter={StaticResource BoolToVis}}"/>
+                        <TextBlock Text="," Visibility="{Binding ShowClosingComma, Converter={StaticResource BoolToVis}}"/>
+                    </StackPanel>
+                </Border>
             </StackPanel>
         </DataTemplate>
     </UserControl.Resources>
